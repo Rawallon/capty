@@ -70,35 +70,28 @@ Tips:
 - **No video output or zero‑byte file**: Check FFmpeg is installed and `DISPLAY` points to your X server (e.g., `:0`).
 - **Cannot write to Videos**: Capty creates `~/Videos` automatically, but verify disk permissions/space.
 
-### Packaging (optional, using fpm)
+### Packaging (optional, using build script)
 If you want to build your own `.deb` locally with names matching this repo:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y ruby ruby-dev build-essential
-sudo gem install --no-document fpm
-
-# Prepare installables
-chmod +x capty.py
-
-# Build the package (adjust version as needed)
-VERSION=0.1.0
-fpm -s dir -t deb -n capty -v "$VERSION" \
-  --depends "python3" \
-  --depends "python3-gi" \
-  --depends "gir1.2-gtk-3.0" \
-  --depends "ffmpeg" \
-  --depends "slop" \
-  --depends "gifsicle" \
-  ./capty.py=/usr/local/bin/capty \
-  ./capty.desktop=/usr/share/applications/capty.desktop \
-  ./icon.png=/usr/share/pixmaps/capty.png
+# Make the build script executable and run it
+chmod +x build_deb.sh
+./build_deb.sh 0.1.0
 ```
+
+The build script will:
+- Install fpm if not already installed
+- Set proper package metadata (description, maintainer, license, etc.)
+- Create a properly named .deb package
+- Show package information after building
+
+You can specify a custom version: `./build_deb.sh 1.2.3`
 
 ### Project structure
 - `capty.py`: main GTK application.
 - `capty.desktop`: desktop launcher entry (Exec: `/usr/local/bin/capty`).
 - `icon.png`: optional icon if you package it.
+- `build_deb.sh`: build script for creating .deb packages with proper metadata.
 - `capty_0.1.0_amd64.deb`: prebuilt Debian package (if present).
 
 ### License
