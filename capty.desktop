@@ -1,0 +1,8 @@
+  [Desktop Entry]
+  Name=Capty
+  Comment=Record a selected area to MP4 or GIF
+  Exec=/usr/local/bin/capty
+  Terminal=false
+  Type=Application
+  Categories=AudioVideo;Video;Utility;
+  Icon=video-x-generic
