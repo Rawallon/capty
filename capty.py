@@ -41,44 +41,7 @@ class EdgeWindow(Gtk.Window):
         except Exception:
             pass
 
-        self.connect("realize", self.on_realize)
-        self.add_events(
-            Gdk.EventMask.BUTTON_PRESS_MASK
-            | Gdk.EventMask.BUTTON_RELEASE_MASK
-            | Gdk.EventMask.POINTER_MOTION_MASK
-            | Gdk.EventMask.SCROLL_MASK
-        )
-        self.connect("button-press-event", self.on_input_event)
-        self.connect("button-release-event", self.on_input_event)
-        self.connect("scroll-event", self.on_input_event)
-        self.connect("motion-notify-event", self.on_input_event)
-
         self.connect("draw", self.on_draw)
-        self.hide()
-
-    def on_realize(self, *args):
-        try:
-            gdk_window = self.get_window()
-            if gdk_window:
-                try:
-                    gdk_window.set_pass_through(True)
-                except Exception:
-                    pass
-                try:
-                    empty_input = Gdk.Region()
-                    gdk_window.input_shape_combine_region(empty_input, 0, 0)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    def set_hide_on_input(self, enabled: bool):
-        self.hide_on_input = bool(enabled)
-
-    def on_input_event(self, *args):
-        if self.hide_on_input and self.parent_hide_callback:
-            self.parent_hide_callback()
-        return False
 
     def set_geometry(self, x: int, y: int, w: int, h: int):
         self.move(int(x), int(y))
@@ -119,10 +82,6 @@ class OverlayWindow:
 
     def hide(self):
         self._hide_all()
-
-    def set_hide_on_input(self, enabled: bool):
-        for win in (self.top, self.bottom, self.left, self.right):
-            win.set_hide_on_input(enabled)
 
     def set_rect(self, rect):
         self.rect = rect
@@ -180,7 +139,7 @@ class RecorderUI:
 
         grid.attach(Gtk.Label(label="Filename:"), 0, 0, 1, 1)
         self.filename_entry = Gtk.Entry()
-        self.filename_entry.set_text(f"capture-{time.strftime('%Y%m%d-%H%M%S')}")
+        self.filename_entry.set_text(f"capture-{time.strftime("-%Y-%m-%d-%H-%M-%S")}")
         grid.attach(self.filename_entry, 1, 0, 2, 1)
 
         grid.attach(Gtk.Label(label="Delay (s):"), 0, 1, 1, 1)
@@ -318,9 +277,6 @@ class RecorderUI:
             try:
                 # short delay
                 time.sleep(delay)
-                # keep overlay visible; enable hide-on-input safety in case compositor ignores shapes
-                GLib.idle_add(self.overlay.set_hide_on_input, True)
-                GLib.idle_add(self.overlay.show_all)
                 GLib.idle_add(self.status.set_text, "Recording...")
                 # Start ffmpeg as a process group so we can stop it gracefully
                 self.ffproc = subprocess.Popen(ff_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=os.setsid)
@@ -367,10 +323,6 @@ class RecorderUI:
         self.record_btn.set_sensitive(True)
         self.stop_btn.set_sensitive(False)
         self.select_btn.set_sensitive(True)
-        # show overlay again (shows the selection border) so user sees where they recorded
-        if self.selected:
-            self.overlay.set_hide_on_input(False)
-            self.overlay.show_all()
 
         if to_gif:
             self.status.set_text("Converting to GIF...")
