@@ -3,6 +3,8 @@
     push:
       tags:
         - 'v*'
+  permissions:
+    contents: write
   jobs:
     build:
       runs-on: ubuntu-latest
@@ -41,5 +43,6 @@
           uses: softprops/action-gh-release@v2
           with:
             files: capty_*_amd64.deb
+            update_existing: true
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
