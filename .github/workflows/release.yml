@@ -28,7 +28,7 @@
               --depends "gifsicle" \
               --maintainer "rawallon@wallon" \
               --description "Capty is a simple area screen recorder for Linux that lets you quickly record a selected screen area to MP4 or GIF. It provides a tiny GTK window to pick a region, set a delay, choose FPS and format, then start/stop recording. Features include area selection, MP4/GIF output, FPS control, delayed start, overlay, and hotkey support." \
-              --url "https://github.com/rawallon/screen-recorder" \
+              --url "https://github.com/Rawallon/capty" \
               --category "Utility" \
               --license "CC-BY-NC-4.0" \
               --vendor "rawallon" \
