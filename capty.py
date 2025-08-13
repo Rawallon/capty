@@ -31,139 +31,177 @@ FRAMERATE = 15
 
 # CSS for modern styling
 CSS_STYLE = """
-.window {
-    background: linear-gradient(180deg, #FF8C00 0%, #DC143C 100%);
+/* Floating bar styling */
+window {
+    background: rgba(40, 40, 40, 0.85);
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-.control-bar {
-    background: rgba(139, 69, 19, 0.9);
+.floating-bar {
+    background: rgba(60, 60, 60, 0.9);
     border-radius: 8px;
-    padding: 8px;
-    margin: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.option-button {
-    background: rgba(160, 82, 45, 0.8);
-    border: none;
-    border-radius: 6px;
-    padding: 8px 12px;
-    color: white;
-    font-weight: bold;
-    transition: all 0.2s ease;
-}
-
-.option-button:hover {
-    background: rgba(160, 82, 45, 1.0);
-}
-
-.option-button:active {
-    background: rgba(139, 69, 19, 1.0);
-}
-
-.audio-toggle {
-    background: rgba(160, 82, 45, 0.8);
-    border: none;
-    border-radius: 8px;
-    padding: 10px 15px;
-    color: white;
-    font-weight: bold;
-    margin: 0 5px;
-    transition: all 0.2s ease;
-}
-
-.audio-toggle:hover {
-    background: rgba(160, 82, 45, 1.0);
-}
-
-.audio-toggle.active {
-    background: rgba(34, 139, 34, 0.9);
-}
-
-.audio-toggle.inactive {
-    background: rgba(139, 69, 19, 0.9);
-}
-
-.dropdown-button {
-    background: rgba(160, 82, 45, 0.8);
-    border: none;
-    border-radius: 6px;
-    padding: 8px 12px;
-    color: white;
-    font-weight: bold;
-    transition: all 0.2s ease;
-}
-
-.dropdown-button:hover {
-    background: rgba(160, 82, 45, 1.0);
-}
-
-.dropdown-menu {
-    background: rgba(139, 69, 19, 0.95);
-    border-radius: 6px;
+/* Button styling */
+.scope-button {
+    background: rgba(80, 80, 80, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.dropdown-item {
-    background: transparent;
-    border: none;
-    color: white;
-    padding: 8px 12px;
-    transition: background 0.2s ease;
-}
-
-.dropdown-item:hover {
-    background: rgba(160, 82, 45, 0.8);
-}
-
-.record-button {
-    background: rgba(220, 20, 60, 0.9);
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
+    border-radius: 6px;
     color: white;
     font-weight: bold;
-    font-size: 14px;
     transition: all 0.2s ease;
 }
 
-.record-button:hover {
-    background: rgba(220, 20, 60, 1.0);
+.scope-button:hover {
+    background: rgba(100, 100, 100, 0.9);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
-.record-button:active {
-    background: rgba(178, 34, 34, 1.0);
+.scope-button.selected {
+    background: rgba(100, 150, 255, 0.8);
+    border-color: rgba(100, 150, 255, 1.0);
 }
 
-.stop-button {
-    background: rgba(128, 128, 128, 0.9);
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
+.status-button {
+    background: rgba(80, 80, 80, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
     color: white;
-    font-weight: bold;
-    font-size: 14px;
+    font-size: 12px;
     transition: all 0.2s ease;
 }
 
-.stop-button:hover {
-    background: rgba(128, 128, 128, 1.0);
+.status-button:hover {
+    background: rgba(100, 100, 100, 0.9);
+}
+
+.status-button.active {
+    background: rgba(76, 175, 80, 0.8);
+    border-color: rgba(76, 175, 80, 1.0);
+}
+
+.status-button.inactive {
+    background: rgba(244, 67, 54, 0.8);
+    border-color: rgba(244, 67, 54, 1.0);
+}
+
+.settings-button {
+    background: rgba(80, 80, 80, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: white;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.settings-button:hover {
+    background: rgba(100, 100, 100, 0.9);
 }
 
 .close-button {
-    background: rgba(160, 82, 45, 0.8);
+    background: rgba(244, 67, 54, 0.8);
     border: none;
     border-radius: 4px;
-    padding: 6px 10px;
     color: white;
     font-weight: bold;
     transition: all 0.2s ease;
 }
 
 .close-button:hover {
-    background: rgba(220, 20, 60, 0.9);
+    background: rgba(244, 67, 54, 1.0);
+}
+
+/* Separator styling */
+separator {
+    background-color: rgba(100, 100, 100, 0.5);
+}
+
+/* Settings popup styling */
+.settings-popup {
+    background: rgba(50, 50, 50, 0.95);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.settings-title {
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Form elements in settings */
+entry {
+    background: rgba(60, 60, 60, 0.8);
+    border: 1px solid rgba(100, 100, 100, 0.5);
+    border-radius: 4px;
+    padding: 6px;
+    color: white;
+}
+
+entry:focus {
+    border-color: rgba(100, 150, 255, 0.8);
+}
+
+spinbutton {
+    background: rgba(60, 60, 60, 0.8);
+    border: 1px solid rgba(100, 100, 100, 0.5);
+    border-radius: 4px;
+    color: white;
+}
+
+radiobutton {
+    color: white;
+}
+
+label {
+    color: white;
+}
+
+/* Record/Stop buttons */
+.record-button {
+    background: rgba(76, 175, 80, 0.9);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 6px;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.record-button:hover {
+    background: rgba(76, 175, 80, 1.0);
+    border-color: rgba(76, 175, 80, 0.8);
+}
+
+.stop-button {
+    background: rgba(128, 128, 128, 0.9);
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    border-radius: 6px;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.stop-button:hover {
+    background: rgba(128, 128, 128, 1.0);
+    border-color: rgba(128, 128, 128, 0.8);
+}
+
+.close-settings-button {
+    background: rgba(80, 80, 80, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: white;
+    transition: all 0.2s ease;
+}
+
+.close-settings-button:hover {
+    background: rgba(100, 100, 100, 0.9);
 }
 
 .status-label {
@@ -172,6 +210,31 @@ CSS_STYLE = """
     background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
     padding: 4px 8px;
+}
+
+/* Dropdown styling */
+.dropdown-menu {
+    background: rgba(50, 50, 50, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-item {
+    background: rgba(60, 60, 60, 0.8);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    color: white;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    margin: 2px;
+}
+
+.dropdown-item:hover {
+    background: rgba(100, 150, 255, 0.8);
+    color: white;
 }
 """
 
@@ -268,14 +331,23 @@ class OverlayWindow:
 
 class RecorderUI:
     def __init__(self):
-        # Main floating control window
-        self.window = Gtk.Window(title="Capty Screen Recorder")
-        self.window.set_border_width(0)
-        self.window.set_resizable(False)
+        # Main floating control bar
+        self.window = Gtk.Window(title="Capty")
+        self.window.set_decorated(False)  # No window decorations
         self.window.set_keep_above(True)
-        self.window.set_type_hint(Gdk.WindowTypeHint.DIALOG)
-        self.window.set_default_size(400, 300)
+        self.window.set_type_hint(Gdk.WindowTypeHint.DOCK)
+        self.window.set_default_size(500, 50)
+
         self.window.connect("destroy", Gtk.main_quit)
+        
+        # Make window draggable
+        self.window.connect("button-press-event", self.on_window_button_press)
+        self.window.connect("button-release-event", self.on_window_button_release)
+        self.window.connect("motion-notify-event", self.on_window_motion)
+        self.window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+        
+        # Position window at bottom center of screen
+        self.center_window_bottom()
         
         # Apply CSS styling
         css_provider = Gtk.CssProvider()
@@ -283,149 +355,192 @@ class RecorderUI:
         screen = Gdk.Screen.get_default()
         style_context = Gtk.StyleContext()
         style_context.add_provider_for_screen(screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        
-        # Add CSS class to window
-        self.window.get_style_context().add_class("window")
 
-        # Main container
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        self.window.add(main_box)
-
-        # Control bar (the brown bar from the image)
+        # Main horizontal control bar
         control_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        control_bar.get_style_context().add_class("control-bar")
-        main_box.pack_start(control_bar, False, False, 0)
+        control_bar.set_margin_start(12)
+        control_bar.set_margin_end(12)
+        control_bar.set_margin_top(8)
+        control_bar.set_margin_bottom(8)
+        control_bar.get_style_context().add_class("floating-bar")
+        self.window.add(control_bar)
 
-        # Close button
+        # Close button (X)
         close_btn = Gtk.Button(label="✕")
-        close_btn.get_style_context().add_class("close-button")
+        close_btn.set_relief(Gtk.ReliefStyle.NONE)
+        close_btn.set_size_request(24, 24)
         close_btn.connect("clicked", lambda w: Gtk.main_quit())
+        close_btn.get_style_context().add_class("close-button")
         control_bar.pack_start(close_btn, False, False, 0)
 
-        # Top options: Display, Window, Area
-        options_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        control_bar.pack_start(options_box, True, True, 0)
-
-        # Display button with dropdown
+        # Recording scope options
+        scope_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        control_bar.pack_start(scope_box, False, False, 0)
+        
+        # Display button
         self.display_btn = Gtk.Button(label="Display")
-        self.display_btn.get_style_context().add_class("option-button")
+        self.display_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self.display_btn.set_size_request(60, 30)
+        self.display_btn.get_style_context().add_class("scope-button")
         self.display_btn.connect("clicked", self.on_display_clicked)
-        options_box.pack_start(self.display_btn, False, False, 0)
+        scope_box.pack_start(self.display_btn, False, False, 0)
 
         # Area button
         self.area_btn = Gtk.Button(label="Area")
-        self.area_btn.get_style_context().add_class("option-button")
+        self.area_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self.area_btn.set_size_request(60, 30)
+        self.area_btn.get_style_context().add_class("scope-button")
+        self.area_btn.get_style_context().add_class("selected")
         self.area_btn.connect("clicked", self.on_area_clicked)
-        options_box.pack_start(self.area_btn, False, False, 0)
+        scope_box.pack_start(self.area_btn, False, False, 0)
 
-        # Audio toggles
-        audio_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        # Separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        control_bar.pack_start(separator, False, False, 0)
+
+        # Audio status indicators
+        audio_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         control_bar.pack_start(audio_box, False, False, 0)
-
-        # Microphone toggle
-        self.mic_btn = Gtk.Button(label="🎤 No microphone")
-        self.mic_btn.get_style_context().add_class("audio-toggle")
+        
+        # Microphone status
+        self.mic_btn = Gtk.Button(label="🎤 No mic")
+        self.mic_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self.mic_btn.set_size_request(70, 30)
+        self.mic_btn.get_style_context().add_class("status-button")
         self.mic_btn.get_style_context().add_class("inactive")
         self.mic_btn.connect("clicked", self.on_mic_toggle)
         self.mic_enabled = False
         audio_box.pack_start(self.mic_btn, False, False, 0)
 
-        # System audio toggle
-        self.system_audio_btn = Gtk.Button(label="🔊 No system audio")
-        self.system_audio_btn.get_style_context().add_class("audio-toggle")
+        # System audio status
+        self.system_audio_btn = Gtk.Button(label="🔊 No audio")
+        self.system_audio_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self.system_audio_btn.set_size_request(80, 30)
+        self.system_audio_btn.get_style_context().add_class("status-button")
         self.system_audio_btn.get_style_context().add_class("inactive")
         self.system_audio_btn.connect("clicked", self.on_system_audio_toggle)
         self.system_audio_enabled = False
         audio_box.pack_start(self.system_audio_btn, False, False, 0)
 
-        # Settings and dropdown arrow
-        settings_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        control_bar.pack_end(settings_box, False, False, 0)
+        # Separator
+        separator2 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        control_bar.pack_start(separator2, False, False, 0)
 
+        # Record/Stop button (single toggle button)
+        self.record_btn = Gtk.Button(label="🔴 Record")
+        self.record_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self.record_btn.set_size_request(80, 30)
+        self.record_btn.get_style_context().add_class("record-button")
+        self.record_btn.connect("clicked", self.on_record_clicked)
+        control_bar.pack_start(self.record_btn, False, False, 0)
+
+        # Separator
+        separator3 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        control_bar.pack_start(separator3, False, False, 0)
+
+        # Settings button
         settings_btn = Gtk.Button(label="⚙")
-        settings_btn.get_style_context().add_class("option-button")
+        settings_btn.set_relief(Gtk.ReliefStyle.NONE)
+        settings_btn.set_size_request(32, 32)
+        settings_btn.get_style_context().add_class("settings-button")
         settings_btn.connect("clicked", self.on_settings_clicked)
-        settings_box.pack_start(settings_btn, False, False, 0)
+        control_bar.pack_start(settings_btn, False, False, 0)
 
-        dropdown_btn = Gtk.Button(label="▼")
-        dropdown_btn.get_style_context().add_class("dropdown-button")
-        dropdown_btn.connect("clicked", self.on_dropdown_clicked)
-        settings_box.pack_start(dropdown_btn, False, False, 0)
-
-        # Main content area
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        main_box.pack_start(content_box, True, True, 0)
-
-        # Filename input
+        # Settings popup (initially hidden)
+        self.settings_popup = Gtk.Window(title="Settings")
+        self.settings_popup.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+        self.settings_popup.set_default_size(350, 250)
+        self.settings_popup.set_transient_for(self.window)
+        self.settings_popup.set_modal(True)
+        self.settings_popup.set_decorated(False)
+        self.settings_popup.get_style_context().add_class("settings-popup")
+        
+        settings_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        settings_vbox.set_margin_start(20)
+        settings_vbox.set_margin_end(20)
+        settings_vbox.set_margin_top(20)
+        settings_vbox.set_margin_bottom(20)
+        self.settings_popup.add(settings_vbox)
+        
+        # Settings title
+        title_label = Gtk.Label(label="<b>Recording Settings</b>", use_markup=True)
+        title_label.get_style_context().add_class("settings-title")
+        settings_vbox.pack_start(title_label, False, False, 0)
+        
+        # Filename
         filename_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        content_box.pack_start(filename_box, False, False, 0)
-        
-        filename_label = Gtk.Label(label="Filename:")
-        filename_label.get_style_context().add_class("status-label")
-        filename_box.pack_start(filename_label, False, False, 0)
-        
+        filename_box.pack_start(Gtk.Label(label="Filename:"), False, False, 0)
         self.filename_entry = Gtk.Entry()
-        self.filename_entry.set_text(f"capture-{time.strftime('%Y-%m-%d-%H-%M-%S')}")
+        self.filename_entry.set_text(f"capture-{time.strftime('%Y%m%d-%H%M%S')}")
         filename_box.pack_start(self.filename_entry, True, True, 0)
-
-        # Format selection
+        settings_vbox.pack_start(filename_box, False, False, 0)
+        
+        # Format
         format_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        content_box.pack_start(format_box, False, False, 0)
-        
-        format_label = Gtk.Label(label="Format:")
-        format_label.get_style_context().add_class("status-label")
-        format_box.pack_start(format_label, False, False, 0)
-        
+        format_box.pack_start(Gtk.Label(label="Format:"), False, False, 0)
         self.format_mp4 = Gtk.RadioButton.new_with_label(None, "MP4")
         self.format_gif = Gtk.RadioButton.new_with_label_from_widget(self.format_mp4, "GIF")
         format_box.pack_start(self.format_mp4, False, False, 0)
         format_box.pack_start(self.format_gif, False, False, 0)
-
-        # FPS input
+        settings_vbox.pack_start(format_box, False, False, 0)
+        
+        # FPS
         fps_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        content_box.pack_start(fps_box, False, False, 0)
-        
-        fps_label = Gtk.Label(label="FPS:")
-        fps_label.get_style_context().add_class("status-label")
-        fps_box.pack_start(fps_label, False, False, 0)
-        
+        fps_box.pack_start(Gtk.Label(label="FPS:"), False, False, 0)
         self.fps_spin = Gtk.SpinButton()
         fps_adj = Gtk.Adjustment(value=30, lower=1, upper=240, step_increment=1, page_increment=10, page_size=0)
         self.fps_spin.set_adjustment(fps_adj)
         fps_box.pack_start(self.fps_spin, False, False, 0)
-
-        # Record/Stop buttons
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        content_box.pack_start(button_box, False, False, 0)
+        settings_vbox.pack_start(fps_box, False, False, 0)
         
-        self.record_btn = Gtk.Button(label="Record")
-        self.record_btn.get_style_context().add_class("record-button")
-        self.record_btn.connect("clicked", self.on_record_clicked)
-        button_box.pack_start(self.record_btn, True, True, 0)
+        # Delay
+        delay_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        delay_box.pack_start(Gtk.Label(label="Delay (s):"), False, False, 0)
+        self.delay_spin = Gtk.SpinButton()
+        delay_adj = Gtk.Adjustment(value=3, lower=0, upper=60, step_increment=1, page_increment=5, page_size=0)
+        self.delay_spin.set_adjustment(delay_adj)
+        delay_box.pack_start(self.delay_spin, False, False, 0)
+        settings_vbox.pack_start(delay_box, False, False, 0)
+        
 
-        self.stop_btn = Gtk.Button(label="Stop")
-        self.stop_btn.get_style_context().add_class("stop-button")
-        self.stop_btn.set_sensitive(False)
-        self.stop_btn.connect("clicked", self.on_stop_clicked)
-        button_box.pack_start(self.stop_btn, True, True, 0)
-
-        # Status label
-        self.status = Gtk.Label(label="Ready to record")
+        
+        # Status
+        self.status = Gtk.Label(label="Ready")
         self.status.get_style_context().add_class("status-label")
-        content_box.pack_start(self.status, False, False, 0)
+        settings_vbox.pack_start(self.status, False, False, 0)
+        
+        # Close settings button
+        close_settings_btn = Gtk.Button(label="Close")
+        close_settings_btn.get_style_context().add_class("close-settings-button")
+        close_settings_btn.connect("clicked", lambda w: self.settings_popup.hide())
+        settings_vbox.pack_start(close_settings_btn, False, False, 0)
 
-        # Display dropdown popover
-        self.display_popover = Gtk.Popover()
-        self.display_popover.get_style_context().add_class("dropdown-menu")
-        self.display_popover.set_relative_to(self.display_btn)
-        self.display_popover.set_position(Gtk.PositionType.BOTTOM)
+        # Display dropdown window (separate floating window)
+        self.display_popup = Gtk.Window(title="Select Display")
+        self.display_popup.set_type_hint(Gdk.WindowTypeHint.TOOLTIP)  # Make it look like a tooltip
+        self.display_popup.set_default_size(200, 120)
+        self.display_popup.set_transient_for(self.window)
+        self.display_popup.set_modal(False)  # Don't block interaction
+        self.display_popup.set_decorated(False)
+        self.display_popup.set_keep_above(True)
+        self.display_popup.set_skip_taskbar_hint(True)
+        self.display_popup.set_skip_pager_hint(True)
+        self.display_popup.get_style_context().add_class("dropdown-menu")
+        
+        # Create a scrolled window for the display list
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_min_content_height(80)
+        scrolled_window.set_max_content_height(120)
+        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         
         self.display_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        self.display_popover.add(self.display_list)
+        self.display_list.set_margin_start(12)
+        self.display_list.set_margin_end(12)
+        self.display_list.set_margin_top(12)
+        self.display_list.set_margin_bottom(12)
+        
+        scrolled_window.add(self.display_list)
+        self.display_popup.add(scrolled_window)
         
         # Get available displays
         self.displays = self.get_available_displays()
@@ -442,30 +557,128 @@ class RecorderUI:
         self.out_mp4 = None
         self.out_gif = None
         self.palette = None
-        self.recording_mode = None  # 'display', 'window', 'area'
+        self.recording_mode = 'area'  # Default to area mode
+        self.dragging = False
+        self.drag_start_x = 0
+        self.drag_start_y = 0
 
         # Log initialization
         logger.info("Capty Screen Recorder initialized")
 
+    def position_display_popup(self):
+        """Position the display popup like a dropdown below the display button"""
+        try:
+            # Get the position of the main window
+            main_x, main_y = self.window.get_position()
+            
+            # Get the display button position relative to the main window
+            # Since the display button is the first scope button, estimate its position
+            # Main window has margins, and display button is after close button
+            button_x = main_x + 12 + 24 + 6  # margin + close button width + spacing
+            button_y = main_y + 8  # margin top
+            button_width = 60  # display button width
+            button_height = 30  # display button height
+            
+            # Position popup directly below the display button
+            popup_x = button_x
+            popup_y = button_y + button_height + 5  # 5px gap
+            
+            # Ensure popup stays on screen
+            screen = Gdk.Screen.get_default()
+            if screen:
+                screen_width = screen.get_width()
+                screen_height = screen.get_height()
+                
+                # If popup would go off the right edge, align to right edge of button
+                if popup_x + 200 > screen_width:
+                    popup_x = button_x + button_width - 200
+                
+                # If popup would go off the bottom, position above the button
+                if popup_y + 120 > screen_height:
+                    popup_y = button_y - 125  # 5px gap above
+            
+            self.display_popup.move(popup_x, popup_y)
+            logger.info(f"Positioned display popup at ({popup_x}, {popup_y})")
+        except Exception as e:
+            logger.error(f"Error positioning display popup: {e}")
+
+    def center_window_bottom(self):
+        """Position window at bottom center of screen"""
+        try:
+            screen = Gdk.Screen.get_default()
+            if screen:
+                screen_width = screen.get_width()
+                screen_height = screen.get_height()
+                window_width = 500
+                window_height = 50
+                x = (screen_width - window_width) // 2
+                y = screen_height - window_height - 50  # 50px from bottom
+                self.window.move(x, y)
+        except Exception as e:
+            print(f"Error centering window: {e}")
+
+    def on_window_button_press(self, widget, event):
+        """Handle window dragging"""
+        if event.button == 1:  # Left mouse button
+            self.dragging = True
+            pos = self.window.get_position()
+            self.drag_start_x = event.x_root - pos[0]
+            self.drag_start_y = event.y_root - pos[1]
+        return False
+
+    def on_window_button_release(self, widget, event):
+        """Handle window dragging stop"""
+        if event.button == 1:  # Left mouse button
+            self.dragging = False
+        return False
+
+    def on_window_motion(self, widget, event):
+        """Handle window dragging"""
+        if self.dragging and self.window:
+            try:
+                x = event.x_root - self.drag_start_x
+                y = event.y_root - self.drag_start_y
+                # Ensure window stays on screen
+                screen = Gdk.Screen.get_default()
+                if screen:
+                    max_x = screen.get_width() - self.window.get_allocated_width()
+                    max_y = screen.get_height() - self.window.get_allocated_height()
+                    x = max(0, min(x, max_x))
+                    y = max(0, min(y, max_y))
+                self.window.move(x, y)
+            except Exception as e:
+                print(f"Dragging error: {e}")
+                self.dragging = False
+        return False
+
     def get_available_displays(self):
         """Get list of available displays"""
         try:
-            # Use xrandr to get display information
-            result = subprocess.run(["xrandr", "--listmonitors"], 
+            # Use xrandr --query to get display information (cleaner output)
+            result = subprocess.run(["xrandr", "--query"], 
                                   capture_output=True, text=True, check=True)
             displays = []
-            lines = result.stdout.strip().split('\n')[1:]  # Skip header
+            lines = result.stdout.strip().split('\n')
+            
             for line in lines:
-                if line.strip():
-                    parts = line.strip().split()
-                    if len(parts) >= 4:
-                        display_name = parts[0]
-                        resolution = f"{parts[2]}x{parts[3]}"
-                        displays.append({
-                            'name': display_name,
-                            'resolution': resolution,
-                            'full_name': f"{display_name} ({resolution})"
-                        })
+                if " connected " in line:
+                    parts = line.split()
+                    display_name = parts[0]  # This is the actual display name like HDMI-0, DP-2
+                    
+                    # Extract resolution from the line
+                    resolution = "1920x1080"  # Default
+                    for part in parts:
+                        if 'x' in part and part[0].isdigit():
+                            # Extract just the resolution part (e.g., "2560x1080" from "2560x1080+1920+0")
+                            resolution = part.split('+')[0]
+                            break
+                    
+                    displays.append({
+                        'name': display_name,
+                        'resolution': resolution,
+                        'full_name': f"{display_name} ({resolution})"
+                    })
+            
             logger.info(f"Found {len(displays)} displays: {displays}")
             return displays
         except Exception as e:
@@ -474,28 +687,36 @@ class RecorderUI:
 
     def populate_display_list(self):
         """Populate the display dropdown list"""
+        logger.info(f"Populating display list with {len(self.displays)} displays")
+        
         for child in self.display_list.get_children():
             self.display_list.remove(child)
         
         for display in self.displays:
             btn = Gtk.Button(label=display['full_name'])
+            btn.set_size_request(180, 30)  # Set button size
             btn.get_style_context().add_class("dropdown-item")
             btn.connect("clicked", self.on_display_selected, display)
             self.display_list.pack_start(btn, False, False, 0)
+            logger.info(f"Added display button: {display['full_name']}")
         
         self.display_list.show_all()
+        logger.info(f"Display list populated with {len(self.displays)} items")
 
     def on_display_clicked(self, button):
         """Handle display button click"""
         logger.info("Display button clicked")
-        self.display_popover.show_all()
         self.recording_mode = 'display'
+        
+        # Position the popup near the display button
+        self.position_display_popup()
+        self.display_popup.show_all()
 
     def on_display_selected(self, button, display):
         """Handle display selection from dropdown"""
         self.selected_display = display
         self.display_btn.set_label(f"Display: {display['name']}")
-        self.display_popover.hide()
+        self.display_popup.hide()
         logger.info(f"Display selected: {display['name']} ({display['resolution']})")
         self.status.set_text(f"Selected display: {display['name']}")
 
@@ -536,8 +757,7 @@ class RecorderUI:
     def on_settings_clicked(self, button):
         """Handle settings button click"""
         logger.info("Settings button clicked")
-        # TODO: Implement settings dialog
-        self.status.set_text("Settings (not implemented yet)")
+        self.settings_popup.show_all()
 
     def on_dropdown_clicked(self, button):
         """Handle dropdown arrow click"""
@@ -576,8 +796,13 @@ class RecorderUI:
         self.window.show_all()
 
     def on_record_clicked(self, btn):
-        """Handle record button click"""
-        logger.info("Record button clicked")
+        """Handle record/stop button click - toggles between record and stop"""
+        if self.ffproc:  # Currently recording, so stop
+            self._stop_recording()
+            return
+        
+        # Not recording, so start recording
+        logger.info("Record button clicked - starting recording")
         
         # Determine what to record based on mode
         if self.recording_mode == 'display':
@@ -664,9 +889,10 @@ class RecorderUI:
 
         logger.info(f"FFmpeg command: {' '.join(ff_cmd)}")
 
-        # Update UI
-        self.record_btn.set_sensitive(False)
-        self.stop_btn.set_sensitive(True)
+        # Update UI - change button to stop state
+        self.record_btn.set_label("⏹ Stop")
+        self.record_btn.get_style_context().remove_class("record-button")
+        self.record_btn.get_style_context().add_class("stop-button")
         self.status.set_text("Starting recording...")
 
         def record_worker():
@@ -681,15 +907,18 @@ class RecorderUI:
             except Exception as e:
                 logger.error(f"Recording error: {e}")
                 GLib.idle_add(self.status.set_text, f"Error: {e}")
-                self.ffproc = None
+                GLib.idle_add(self.reset_recording_state)
 
         self.record_thread = Thread(target=record_worker, daemon=True)
         self.record_thread.start()
 
-    def on_stop_clicked(self, btn):
-        """Handle stop button click"""
-        logger.info("Stop button clicked")
-        self._stop_recording()
+    def reset_recording_state(self):
+        """Reset recording state and button"""
+        self.ffproc = None
+        self.record_thread = None
+        self.record_btn.set_label("🔴 Record")
+        self.record_btn.get_style_context().remove_class("stop-button")
+        self.record_btn.get_style_context().add_class("record-button")
 
     def _stop_recording(self):
         """Stop the recording process"""
@@ -701,6 +930,8 @@ class RecorderUI:
             logger.info(f"Stopping recording process (PID: {self.ffproc.pid})")
             os.killpg(os.getpgid(self.ffproc.pid), signal.SIGINT)
             self.status.set_text("Stopping...")
+            # Reset state after stopping
+            self.reset_recording_state()
         except Exception as e:
             logger.error(f"Stop error: {e}")
             try:
@@ -708,13 +939,22 @@ class RecorderUI:
                 logger.info("Process terminated")
             except:
                 logger.error("Failed to terminate process")
+            # Reset state even if there was an error
+            self.reset_recording_state()
 
     def on_record_finished(self, to_gif):
         """Handle recording completion"""
         logger.info("Recording finished")
         self.status.set_text("Recording finished")
-        self.record_btn.set_sensitive(True)
-        self.stop_btn.set_sensitive(False)
+        
+        # Reset recording state
+        self.ffproc = None
+        self.record_thread = None
+        
+        # Reset button to record state
+        self.record_btn.set_label("🔴 Record")
+        self.record_btn.get_style_context().remove_class("stop-button")
+        self.record_btn.get_style_context().add_class("record-button")
 
         if to_gif:
             logger.info("Starting GIF conversion")
