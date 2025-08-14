@@ -191,6 +191,21 @@ label {
     border-color: rgba(128, 128, 128, 0.8);
 }
 
+.disabled-button {
+    background: rgba(128, 128, 128, 0.5);
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: bold;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.disabled-button:hover {
+    background: rgba(128, 128, 128, 0.5);
+    border-color: rgba(128, 128, 128, 0.3);
+}
+
 .close-settings-button {
     background: rgba(80, 80, 80, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -403,7 +418,7 @@ class RecorderUI:
         control_bar.pack_start(audio_box, False, False, 0)
         
         # Microphone status
-        self.mic_btn = Gtk.Button(label="🎤 No mic")
+        self.mic_btn = Gtk.Button(label="🎤 OFF")
         self.mic_btn.set_relief(Gtk.ReliefStyle.NONE)
         self.mic_btn.set_size_request(70, 30)
         self.mic_btn.get_style_context().add_class("status-button")
@@ -413,7 +428,7 @@ class RecorderUI:
         audio_box.pack_start(self.mic_btn, False, False, 0)
 
         # System audio status
-        self.system_audio_btn = Gtk.Button(label="🔊 No audio")
+        self.system_audio_btn = Gtk.Button(label="🔊 OFF")
         self.system_audio_btn.set_relief(Gtk.ReliefStyle.NONE)
         self.system_audio_btn.set_size_request(80, 30)
         self.system_audio_btn.get_style_context().add_class("status-button")
@@ -563,6 +578,7 @@ class RecorderUI:
         self.drag_start_y = 0
 
         # Log initialization
+        self.update_record_button_state()  # Set initial button state
         logger.info("Capty Screen Recorder initialized")
 
     def position_display_popup(self):
@@ -728,23 +744,35 @@ class RecorderUI:
         self.display_popup.hide()
         logger.info(f"Display selected: {display['name']} ({display['resolution']})")
         self.status.set_text(f"Selected display: {display['name']}")
+        
+        # Clear area selection when switching to display mode
+        self.clear_area_selection()
+        
+        self.update_record_button_state()
 
     def on_area_clicked(self, button):
         """Handle area selection"""
         logger.info("Area button clicked")
         self.recording_mode = 'area'
+        
+        # Clear display selection when switching to area mode
+        self.clear_display_selection()
+        
+        # Clear any existing area selection before starting new one
+        self.clear_area_selection()
+        
         self.select_area()
 
     def on_mic_toggle(self, button):
         """Toggle microphone recording"""
         self.mic_enabled = not self.mic_enabled
         if self.mic_enabled:
-            button.set_label("🎤 Microphone")
+            button.set_label("🎤 ON")
             button.get_style_context().remove_class("inactive")
             button.get_style_context().add_class("active")
             logger.info("Microphone enabled")
         else:
-            button.set_label("🎤 No microphone")
+            button.set_label("🎤 OFF")
             button.get_style_context().remove_class("active")
             button.get_style_context().add_class("inactive")
             logger.info("Microphone disabled")
@@ -753,12 +781,12 @@ class RecorderUI:
         """Toggle system audio recording"""
         self.system_audio_enabled = not self.system_audio_enabled
         if self.system_audio_enabled:
-            button.set_label("🔊 System audio")
+            button.set_label("🔊 ON")
             button.get_style_context().remove_class("inactive")
             button.get_style_context().add_class("active")
             logger.info("System audio enabled")
         else:
-            button.set_label("🔊 No system audio")
+            button.set_label("🔊 OFF")
             button.get_style_context().remove_class("active")
             button.get_style_context().add_class("inactive")
             logger.info("System audio disabled")
@@ -796,6 +824,7 @@ class RecorderUI:
             
             logger.info(f"Area selected: {x},{y} {w}x{h}")
             self.status.set_text(f"Area selected: {w}x{h}")
+            self.update_record_button_state()
             
         except subprocess.CalledProcessError as e:
             logger.error(f"Area selection error: {e}")
@@ -804,10 +833,60 @@ class RecorderUI:
     def show(self):
         self.window.show_all()
 
+    def clear_area_selection(self):
+        """Clear the area selection and hide the overlay"""
+        self.selected = None
+        if hasattr(self, 'overlay') and self.overlay:
+            self.overlay.hide()
+        logger.info("Area selection cleared")
+
+    def clear_display_selection(self):
+        """Clear the display selection and reset button text"""
+        self.selected_display = None
+        if hasattr(self, 'display_btn'):
+            self.display_btn.set_label("Display")
+        logger.info("Display selection cleared")
+
+    def can_record(self):
+        """Check if recording is possible"""
+        if self.recording_mode == 'display':
+            return self.selected_display is not None
+        elif self.recording_mode == 'area':
+            return self.selected is not None
+        else:
+            return False
+
+    def update_record_button_state(self):
+        """Update record button appearance based on recording state"""
+        if self.ffproc:  # Currently recording
+            self.record_btn.set_label("⏹ Stop")
+            self.record_btn.get_style_context().remove_class("record-button")
+            self.record_btn.get_style_context().remove_class("disabled-button")
+            self.record_btn.get_style_context().add_class("stop-button")
+            self.record_btn.set_sensitive(True)
+        elif self.can_record():  # Can record
+            self.record_btn.set_label("🔴 Record")
+            self.record_btn.get_style_context().remove_class("stop-button")
+            self.record_btn.get_style_context().remove_class("disabled-button")
+            self.record_btn.get_style_context().add_class("record-button")
+            self.record_btn.set_sensitive(True)
+        else:  # Cannot record
+            self.record_btn.set_label("🔴 Record")
+            self.record_btn.get_style_context().remove_class("record-button")
+            self.record_btn.get_style_context().remove_class("stop-button")
+            self.record_btn.get_style_context().add_class("disabled-button")
+            self.record_btn.set_sensitive(False)
+
     def on_record_clicked(self, btn):
         """Handle record/stop button click - toggles between record and stop"""
         if self.ffproc:  # Currently recording, so stop
             self._stop_recording()
+            return
+        
+        # Check if we can record
+        if not self.can_record():
+            self.status.set_text("Please select a display or area first")
+            logger.warning("No valid recording target selected")
             return
         
         # Not recording, so start recording
@@ -935,9 +1014,7 @@ class RecorderUI:
         """Reset recording state and button"""
         self.ffproc = None
         self.record_thread = None
-        self.record_btn.set_label("🔴 Record")
-        self.record_btn.get_style_context().remove_class("stop-button")
-        self.record_btn.get_style_context().add_class("record-button")
+        self.update_record_button_state()
 
     def _stop_recording(self):
         """Stop the recording process"""
