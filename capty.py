@@ -471,7 +471,7 @@ class RecorderUI:
         filename_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         filename_box.pack_start(Gtk.Label(label="Filename:"), False, False, 0)
         self.filename_entry = Gtk.Entry()
-        self.filename_entry.set_text(f"capture-{time.strftime('%Y%m%d-%H%M%S')}")
+        self.filename_entry.set_text(f"capty")
         filename_box.pack_start(self.filename_entry, True, True, 0)
         settings_vbox.pack_start(filename_box, False, False, 0)
         
@@ -835,13 +835,18 @@ class RecorderUI:
         os.makedirs(outdir, exist_ok=True)
         base_path = os.path.join(outdir, fname)
         
-        # Prevent overwrite
-        mp4_candidate = f"{base_path}.mp4"
-        gif_candidate = f"{base_path}.gif"
-        palette_candidate = f"{base_path}_palette.png"
-        if os.path.exists(mp4_candidate) or os.path.exists(gif_candidate) or os.path.exists(palette_candidate):
-            suffix = time.strftime("-%Y-%m-%d-%H-%M-%S")
-            base_path = f"{base_path}{suffix}"
+        # Prevent overwrite with numbered suffixes
+        counter = 1
+        original_base_path = base_path
+        while True:
+            mp4_candidate = f"{base_path}.mp4"
+            gif_candidate = f"{base_path}.gif"
+            palette_candidate = f"{base_path}_palette.png"
+            if os.path.exists(mp4_candidate) or os.path.exists(gif_candidate) or os.path.exists(palette_candidate):
+                base_path = f"{original_base_path}({counter})"
+                counter += 1
+            else:
+                break
             
         mp4_path = f"{base_path}.mp4"
         gif_path = f"{base_path}.gif"
