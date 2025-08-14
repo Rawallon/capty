@@ -665,17 +665,26 @@ class RecorderUI:
                     parts = line.split()
                     display_name = parts[0]  # This is the actual display name like HDMI-0, DP-2
                     
-                    # Extract resolution from the line
+                    # Extract resolution and position from the line
                     resolution = "1920x1080"  # Default
+                    x_offset = 0
+                    y_offset = 0
+                    
                     for part in parts:
                         if 'x' in part and part[0].isdigit():
-                            # Extract just the resolution part (e.g., "2560x1080" from "2560x1080+1920+0")
-                            resolution = part.split('+')[0]
+                            # Parse the geometry part (e.g., "2560x1080+1920+0")
+                            geometry_parts = part.split('+')
+                            if len(geometry_parts) >= 3:
+                                resolution = geometry_parts[0]
+                                x_offset = int(geometry_parts[1])
+                                y_offset = int(geometry_parts[2])
                             break
                     
                     displays.append({
                         'name': display_name,
                         'resolution': resolution,
+                        'x_offset': x_offset,
+                        'y_offset': y_offset,
                         'full_name': f"{display_name} ({resolution})"
                     })
             
@@ -810,10 +819,15 @@ class RecorderUI:
                 self.status.set_text("Please select a display first")
                 logger.warning("No display selected")
                 return
-            # For display recording, we'll use the full display area
-            # This is a simplified implementation - you might want to get actual display geometry
-            self.selected = (0, 0, 1920, 1080)  # Default, should be improved
-            logger.info(f"Recording display: {self.selected_display['name']}")
+            # For display recording, use the actual display geometry
+            resolution_parts = self.selected_display['resolution'].split('x')
+            width = int(resolution_parts[0])
+            height = int(resolution_parts[1])
+            x_offset = self.selected_display['x_offset']
+            y_offset = self.selected_display['y_offset']
+            
+            self.selected = (x_offset, y_offset, width, height)
+            logger.info(f"Recording display: {self.selected_display['name']} at ({x_offset}, {y_offset}) with size {width}x{height}")
         elif self.recording_mode == 'window' or self.recording_mode == 'area':
             if not self.selected:
                 self.status.set_text("Please select a window/area first")
