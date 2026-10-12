@@ -436,7 +436,7 @@ def icon_font():
 
 ICON_FONT = None
 # glyph name -> (icon-font char, fallback char)
-GLYPHS = {"close": ("\ue711", "\u2715"), "area": ("\ue7a8", "\u2b1a"), "mic": ("\ue720", "\U0001F3A4"),
+GLYPHS = {"close": ("\ue711", "\u2715"), "area": ("\ue7a8", "\u2b1a"), "clear": ("\ue8e6", "\u2715"), "mic": ("\ue720", "\U0001F3A4"),
           "sys": ("\ue767", "\U0001F50A"), "sys_off": ("\ue74f", "\U0001F507"), "down": ("\ue70d", "\u25be")}
 
 
@@ -688,6 +688,7 @@ class App:
             add(RoundButton(row, self.on_close, icon="close", fg=MUTED, hover="#4a2a30", min_w=px(36)))
             sep()
         self.area_btn = add(RoundButton(row, self.on_select, icon="area", label="Area"))
+        self.clear_btn = RoundButton(row, self.on_clear, icon="clear", fg=MUTED, min_w=px(36))  # shown while an area is selected
         self.groups = {}  # kind -> one split button: icon toggles, chevron opens the device list
         for kind, _t in (("mic", "Microphones"), ("sys", "System audio")):
             btn = RoundButton(row, lambda k=kind: self.toggle_kind(k), icon=kind, chevron=True,
@@ -701,7 +702,7 @@ class App:
         self.rec_btn.pack(side="left", padx=(px(6), px(2)))
         self.status_lbl = tk.Label(outer, textvariable=self.status, bg=BG, fg=MUTED, font=(FONT, 8), width=1)
         self.status_lbl.pack(fill="x", padx=px(10), pady=(0, px(8)))
-        self.status_lbl.bind("<Button-1>", lambda e: self.open_folder())
+        self.status_lbl.bind("<Button-1>", lambda e: self.last_saved and self.open_folder())
         for wdg in (outer, row, self.status_lbl):  # drag the toolbar by any empty area
             wdg.bind("<ButtonPress-1>", self._drag_start, add="+")
             wdg.bind("<B1-Motion>", self._drag_move, add="+")
@@ -994,13 +995,17 @@ class App:
         self.selected = rect
         self.manual_pos = False
         self.overlay.show(rect)
+        self.clear_btn.pack(side="left", padx=px(2), after=self.area_btn)
         self.dock()
         self.status.set(f"{rect[2]}\u00d7{rect[3]} selected")
 
     def on_clear(self):
         self.selected = None
+        if self.state != "idle":
+            return
         self.overlay.hide()
         self.manual_pos = False
+        self.clear_btn.pack_forget()
         self.dock()
         self.status.set("Selection cleared")
 
@@ -1130,6 +1135,7 @@ class App:
         else:
             self.rec_btn.look(fill=ACCENT, hover=ACCENT_HOVER, label="Record", enabled=True)
         self.area_btn.look(enabled=self.state == "idle")
+        self.clear_btn.look(enabled=self.state == "idle")
 
     def on_record_click(self):
         if self.state == "idle":
