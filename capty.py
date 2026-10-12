@@ -413,7 +413,7 @@ class ControlBar:
     """Small floating Record/Stop bar docked next to the selection (outside the captured area)."""
     GAP = 8
 
-    KINDS = (("mic", "\U0001F3A4 Mic"), ("sys", "\U0001F50A System"))
+    KINDS = (("mic", "🎤", "🎤"), ("sys", "🔊", "🔇"))  # (kind, icon on, icon off)
 
     def __init__(self, root, on_click, on_toggle, on_menu):
         self.win = tk.Toplevel(root)
@@ -431,7 +431,7 @@ class ControlBar:
         self.label.pack(side="left", padx=(0, 6))
         font = ("Segoe UI Emoji" if WIN else "TkDefaultFont", 10)
         self.groups = {}  # kind -> (frame, toggle button, menu button)
-        for kind, text in self.KINDS:
+        for kind, text, _off in self.KINDS:
             g = tk.Frame(self.win, bg="#202020")
             tb = tk.Button(g, text=text, command=lambda k=kind: on_toggle(k), relief="flat", bd=0,
                            font=font, padx=8, pady=4, fg="white")
@@ -445,11 +445,12 @@ class ControlBar:
 
     def sync_audio(self, states):
         """states: {kind: is_on} for kinds that have devices; kinds missing are hidden."""
+        icons = {k: (on, off) for k, on, off in self.KINDS}
         for kind, (g, tb, _mb) in self.groups.items():
             if kind in states:
                 on = states[kind]
                 tb.config(bg="#2e7d32" if on else "#555555", activebackground="#388e3c" if on else "#6a6a6a",
-                          activeforeground="white", text=dict(self.KINDS)[kind] + (" on" if on else " off"))
+                          activeforeground="white", text=icons[kind][0 if on else 1])
                 g.pack(side="left", padx=(0, 6))
             else:
                 g.pack_forget()
