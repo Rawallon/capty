@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Capty: area screen recorder (Linux: x11grab + slop, Windows: gdigrab). tkinter UI."""
+import json
 import os
 import sys
 import shutil
@@ -7,7 +8,7 @@ import subprocess
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, ttk
 
 WIN = sys.platform == "win32"
 if WIN:
@@ -21,10 +22,87 @@ if WIN:
         except Exception:
             pass
 
-DEFAULT_DIR = os.path.join(os.path.expanduser("~"), "Videos")
-os.makedirs(DEFAULT_DIR, exist_ok=True)
-
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+DEFAULT_DIR = os.path.join(os.path.expanduser("~"), "Videos")
+CONFIG_DIR = os.path.join(
+    os.environ.get("APPDATA") if WIN else os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "capty")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+START_MENU_LINK = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs", "Capty.lnk")
+
+
+DEFAULT_HOTKEYS = {"record": "ctrl+alt+r", "stop": "ctrl+alt+s"}
+WM_HOTKEY, WM_APP, MOD_NOREPEAT = 0x0312, 0x8000, 0x4000
+MODIFIER_KEYSYMS = {"Control_L", "Control_R", "Alt_L", "Alt_R", "Shift_L", "Shift_R", "Super_L", "Super_R",
+                    "Meta_L", "Meta_R", "Caps_Lock", "Num_Lock", "ISO_Level3_Shift"}
+
+
+def parse_hotkey(combo):
+    """'ctrl+alt+s' -> (RegisterHotKey modifier mask, virtual-key code), or None if invalid."""
+    parts = combo.lower().split("+")
+    mods = {"alt": 0x1, "ctrl": 0x2, "shift": 0x4}
+    mask = 0
+    for m in parts[:-1]:
+        if m not in mods:
+            return None
+        mask |= mods[m]
+    key = parts[-1]
+    if len(key) == 1 and key.isalnum():
+        return mask, ord(key.upper())
+    if key.startswith("f") and key[1:].isdigit() and 1 <= int(key[1:]) <= 24:
+        return mask, 0x70 + int(key[1:]) - 1
+    return None
+
+
+def tk_sequence(combo):
+    """'ctrl+alt+s' -> '<Control-Alt-Key-s>' for window-local binding."""
+    if not parse_hotkey(combo):
+        return None
+    names = {"ctrl": "Control", "alt": "Alt", "shift": "Shift"}
+    parts = combo.lower().split("+")
+    key = parts[-1]
+    if (key.startswith("f") and len(key) > 1) or "shift" in parts:
+        key = key.upper()
+    return "<" + "-".join([names[m] for m in parts[:-1]] + ["Key", key]) + ">"
+
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_config(cfg):
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+            json.dump(cfg, fh, indent=2)
+    except OSError as e:
+        print("Could not save config:", e)
+
+
+def install_start_menu():
+    """Windows: add a Start Menu shortcut so Capty is searchable and launchable without a console."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    ico = os.path.join(CONFIG_DIR, "capty.ico")
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(os.path.join(here, "icon.png"), "rb") as fh:
+        png = fh.read()
+    w, h = int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big")
+    with open(ico, "wb") as fh:  # ICO container with an embedded PNG
+        fh.write(bytes([0, 0, 1, 0, 1, 0]) + bytes([w % 256, h % 256, 0, 0, 1, 0, 32, 0])
+                 + len(png).to_bytes(4, "little") + (22).to_bytes(4, "little") + png)
+    pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    if not os.path.exists(pyw):
+        pyw = sys.executable
+    ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{START_MENU_LINK}');"
+          f"$s.TargetPath='{pyw}';$s.Arguments='\"{os.path.join(here, 'capty.py')}\"';"
+          f"$s.WorkingDirectory='{here}';$s.IconLocation='{ico}';$s.Save()")
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True, creationflags=NO_WINDOW)
+    print("Installed Start Menu shortcut:", START_MENU_LINK)
+
 BORDER = 3
 BORDER_COLOR = "#ff9900"
 
@@ -123,6 +201,7 @@ class App:
         self.root.resizable(False, False)
         self.root.attributes("-topmost", True)
 
+        self.cfg = load_config()
         self.selected = None
         self.ffproc = None
         self.out_mp4 = self.out_gif = self.palette = None
@@ -138,50 +217,140 @@ class App:
         self.clear_btn = ttk.Button(row, text="Clear", command=self.on_clear, state="disabled")
         self.clear_btn.pack(side="left", expand=True, fill="x")
 
-        ttk.Label(f, text="Filename:").grid(row=1, column=0, sticky="w")
+        ttk.Label(f, text="Filename:").grid(row=2, column=0, sticky="w")
         self.fname = tk.StringVar(value=time.strftime("capture--%Y-%m-%d-%H-%M-%S"))
-        ttk.Entry(f, textvariable=self.fname).grid(row=1, column=1, columnspan=2, sticky="ew", pady=2)
+        ttk.Entry(f, textvariable=self.fname).grid(row=2, column=1, columnspan=2, sticky="ew", pady=2)
 
-        ttk.Label(f, text="Delay (s):").grid(row=2, column=0, sticky="w")
-        self.delay = tk.IntVar(value=3)
-        ttk.Spinbox(f, from_=0, to=60, textvariable=self.delay, width=6).grid(row=2, column=1, sticky="w", pady=2)
+        ttk.Label(f, text="Save to:").grid(row=2, column=0, sticky="w")
+        self.outdir = tk.StringVar(value=self.cfg.get("outdir") or DEFAULT_DIR)
+        ttk.Entry(f, textvariable=self.outdir, width=34).grid(row=2, column=1, sticky="ew", pady=2)
+        ttk.Button(f, text="Browse...", command=self.on_browse).grid(row=2, column=2, padx=(4, 0))
 
-        ttk.Label(f, text="Format:").grid(row=3, column=0, sticky="w")
-        self.fmt = tk.StringVar(value="mp4")
+        ttk.Label(f, text="Delay (s):").grid(row=3, column=0, sticky="w")
+        self.delay = tk.IntVar(value=self.cfg.get("delay", 3))
+        ttk.Spinbox(f, from_=0, to=60, textvariable=self.delay, width=6).grid(row=3, column=1, sticky="w", pady=2)
+
+        ttk.Label(f, text="Format:").grid(row=4, column=0, sticky="w")
+        self.fmt = tk.StringVar(value=self.cfg.get("format", "mp4"))
         fr = ttk.Frame(f)
-        fr.grid(row=3, column=1, columnspan=2, sticky="w", pady=2)
+        fr.grid(row=4, column=1, columnspan=2, sticky="w", pady=2)
         ttk.Radiobutton(fr, text="MP4 (video)", variable=self.fmt, value="mp4").pack(side="left")
         ttk.Radiobutton(fr, text="GIF (animated)", variable=self.fmt, value="gif").pack(side="left", padx=(8, 0))
 
-        ttk.Label(f, text="FPS:").grid(row=4, column=0, sticky="w")
-        self.fps = tk.IntVar(value=30)
-        ttk.Spinbox(f, from_=1, to=240, textvariable=self.fps, width=6).grid(row=4, column=1, sticky="w", pady=2)
+        ttk.Label(f, text="FPS:").grid(row=5, column=0, sticky="w")
+        self.fps = tk.IntVar(value=self.cfg.get("fps", 30))
+        ttk.Spinbox(f, from_=1, to=240, textvariable=self.fps, width=6).grid(row=5, column=1, sticky="w", pady=2)
+
+        self.hotkeys = {**DEFAULT_HOTKEYS, **self.cfg.get("hotkeys", {})}
+        self.hk_vars = {}
+        for i, (action, label) in enumerate((("record", "Record key:"), ("stop", "Stop key:"))):
+            ttk.Label(f, text=label).grid(row=6 + i, column=0, sticky="w")
+            var = tk.StringVar(value=self.hotkeys[action])
+            self.hk_vars[action] = var
+            ttk.Entry(f, textvariable=var, state="readonly", width=34).grid(row=6 + i, column=1, sticky="ew", pady=2)
+            ttk.Button(f, text="Set...", command=lambda a=action: self.capture_hotkey(a)).grid(
+                row=6 + i, column=2, padx=(4, 0))
 
         row = ttk.Frame(f)
-        row.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(8, 4))
+        row.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(8, 4))
         self.record_btn = ttk.Button(row, text="Record", command=self.on_record)
         self.record_btn.pack(side="left", expand=True, fill="x", padx=(0, 4))
         self.stop_btn = ttk.Button(row, text="Stop", command=self.stop, state="disabled")
         self.stop_btn.pack(side="left", expand=True, fill="x")
 
         self.status = tk.StringVar(value="Ready")
-        ttk.Label(f, textvariable=self.status).grid(row=6, column=0, columnspan=3)
+        ttk.Label(f, textvariable=self.status).grid(row=9, column=0, columnspan=3)
 
-        self.root.bind("<Control-Alt-s>", lambda e: self.stop())
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self._bound = {}
         if WIN:
-            self._start_hotkey()
+            self._start_hotkey_thread()
+        self.apply_hotkeys()
 
-    def _start_hotkey(self):
-        """Windows-only global Ctrl+Alt+S via RegisterHotKey (works while another window has focus)."""
+    HK_ACTIONS = {"record": "on_record", "stop": "stop"}
+
+    def apply_hotkeys(self):
+        """Window-local bindings everywhere; on Windows also global (RegisterHotKey)."""
+        for seq in self._bound.values():
+            self.root.unbind(seq)
+        self._bound = {}
+        for action, combo in self.hotkeys.items():
+            seq = tk_sequence(combo)
+            if seq:
+                self.root.bind(seq, lambda e, a=action: getattr(self, self.HK_ACTIONS[a])())
+                self._bound[action] = seq
+        if WIN:
+            ctypes.windll.user32.PostThreadMessageW(self._hk_tid, WM_APP, 0, 0)
+
+    def _start_hotkey_thread(self):
+        ready = threading.Event()
+
         def loop():
             u32 = ctypes.windll.user32
-            if not u32.RegisterHotKey(None, 1, 0x0002 | 0x0001 | 0x4000, ord("S")):  # CTRL|ALT|NOREPEAT
-                return
             msg = ctypes.wintypes.MSG()
+            u32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 0)  # create this thread's message queue
+            self._hk_tid = ctypes.windll.kernel32.GetCurrentThreadId()
+            ready.set()
+            ids = {}
             while u32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
-                if msg.message == 0x0312:  # WM_HOTKEY
-                    self.root.after(0, self.stop)
+                if msg.message == WM_APP:  # (re)register from current settings
+                    for hid in ids:
+                        u32.UnregisterHotKey(None, hid)
+                    ids = {}
+                    for n, (action, combo) in enumerate(self.hotkeys.items(), 1):
+                        parsed = parse_hotkey(combo)
+                        if parsed and u32.RegisterHotKey(None, n, parsed[0] | MOD_NOREPEAT, parsed[1]):
+                            ids[n] = action
+                        elif parsed:
+                            self.set_status(f"Global key {combo} unavailable (in use?)")
+                elif msg.message == WM_HOTKEY and msg.wParam in ids:
+                    self.root.after(0, getattr(self, self.HK_ACTIONS[ids[msg.wParam]]))
+
         threading.Thread(target=loop, daemon=True).start()
+        ready.wait()
+
+    def capture_hotkey(self, action):
+        var = self.hk_vars[action]
+        var.set("Press keys... (Esc cancels)")
+        old = self.hotkeys[action]
+        win_alt = 0x20000 if WIN else 0x8
+
+        def on_key(e):
+            if e.keysym in MODIFIER_KEYSYMS:
+                return "break"
+            self.root.unbind("<KeyPress>", bind_id)
+            if e.keysym != "Escape":
+                mods = [n for n, m in (("ctrl", 0x4), ("alt", win_alt), ("shift", 0x1)) if e.state & m]
+                combo = "+".join(mods + [e.keysym.lower()])
+                if parse_hotkey(combo) and (mods or e.keysym.lower().startswith("f")):
+                    self.hotkeys[action] = combo
+                    self.apply_hotkeys()
+                    self.save_settings()
+                else:
+                    self.status.set("Use Ctrl/Alt/Shift + a letter, digit or F-key")
+            var.set(self.hotkeys[action])
+            return "break"
+
+        bind_id = self.root.bind("<KeyPress>", on_key, add="+")
+        self.root.focus_force()
+
+    def save_settings(self):
+        try:
+            self.cfg.update(outdir=self.outdir.get().strip(), delay=self.delay.get(),
+                            fps=self.fps.get(), format=self.fmt.get(), hotkeys=self.hotkeys)
+        except tk.TclError:  # spinbox holds non-numeric text
+            return
+        save_config(self.cfg)
+
+    def on_close(self):
+        self.save_settings()
+        self.root.destroy()
+
+    def on_browse(self):
+        d = filedialog.askdirectory(initialdir=self.outdir.get() or DEFAULT_DIR, title="Save recordings to")
+        if d:
+            self.outdir.set(os.path.normpath(d))
+            self.save_settings()
 
     def set_status(self, s):
         self.root.after(0, self.status.set, s)
@@ -213,6 +382,8 @@ class App:
         self.status.set("Selection cleared")
 
     def on_record(self):
+        if str(self.record_btn["state"]) == "disabled":  # already recording / counting down
+            return
         if not self.selected:
             self.status.set("Please select an area first")
             return
@@ -224,7 +395,14 @@ class App:
             self.status.set("ffmpeg not found in PATH")
             return
 
-        base = os.path.join(DEFAULT_DIR, name)
+        outdir = self.outdir.get().strip() or DEFAULT_DIR
+        try:
+            os.makedirs(outdir, exist_ok=True)
+        except OSError as e:
+            self.status.set(f"Cannot use folder: {e}")
+            return
+        self.save_settings()
+        base = os.path.join(outdir, name)
         if any(os.path.exists(base + s) for s in (".mp4", ".gif", "_palette.png")):
             base += time.strftime("-%Y-%m-%d-%H-%M-%S")
         self.out_mp4, self.out_gif, self.palette = base + ".mp4", base + ".gif", base + "_palette.png"
@@ -324,6 +502,11 @@ class App:
 
 
 def main():
+    if "--install" in sys.argv:
+        if not WIN:
+            sys.exit("--install is Windows-only; use the .deb on Linux")
+        install_start_menu()
+        return
     App().run()
 
 

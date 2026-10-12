@@ -8,8 +8,8 @@ Capty lets you quickly record a selected screen area to MP4 or GIF on Linux. It 
 - **FPS control**: choose frames per second.
 - **Delayed start**: countdown before recording begins.
 - **Overlay**: subtle border overlay that is visible when selecting and after recording; hidden while recording so you can work normally.
-- **Hotkey**: Ctrl+Alt+S to stop (when the Capty window has focus).
-- **Saves to**: `~/Videos` (created if missing) with unique filenames.
+- **Hotkeys**: configurable record/stop keys (default Ctrl+Alt+R / Ctrl+Alt+S).
+- **Saves to**: configurable folder (default `~/Videos`) with unique filenames.
 
 ### Requirements
 Install runtime dependencies (Debian/Ubuntu):
@@ -23,13 +23,17 @@ Notes:
 - Capty uses FFmpeg's `x11grab`. It works best on X11. On Wayland, run an X11 session or ensure XWayland is available.
 
 ### Windows
-Requires Python 3 (with tkinter, included in the python.org installer) and `ffmpeg` in `PATH` (e.g. `winget install Gyan.FFmpeg`). Optional: `gifsicle` for GIF optimization.
+Requires Python 3 (with tkinter, included in the python.org installer) and `ffmpeg` in `PATH` (e.g. `winget install Gyan.FFmpeg`). Optional: `gifsicle`.
 
 ```powershell
-python capty.py
+python capty.py --install   # adds a Start Menu shortcut: press Win, type "Capty"
+python capty.py             # or run directly
 ```
 
-Uses FFmpeg `gdigrab` (no slop needed); same `capty.py` as Linux. Ctrl+Alt+S is a global stop hotkey. Output goes to `%USERPROFILE%\Videos`.
+Uses FFmpeg `gdigrab` (no slop needed); same `capty.py` as Linux. Hotkeys are global on Windows.
+
+### Settings
+Save folder, delay, FPS, format and hotkeys are set in the window and remembered (`%APPDATA%\capty\config.json`, or `~/.config/capty/config.json` on Linux). Default hotkeys: Ctrl+Alt+R record, Ctrl+Alt+S stop; click **Set...** next to a key to change it. On Linux hotkeys work while the Capty window has focus.
 
 ### Install
 
