@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, simpledialog
 
 WIN = sys.platform == "win32"
@@ -410,30 +411,121 @@ class Overlay:
 
 
 BG, BORDER_LINE, FG, MUTED = "#1e1e22", "#3a3a40", "#f2f2f7", "#9a9aa3"
-HOVER, ACCENT, ACCENT_HOVER, ON, OFF = "#34343a", "#ff453a", "#ff6259", "#30a14e", BG
+HOVER, ACCENT, ACCENT_HOVER, ON_FILL, ON_HOVER, ON_FG = "#2a2a30", "#ff453a", "#ff6259", "#1f3d2c", "#27503a", "#34d27b"
+NEUTRAL, NEUTRAL_HOVER = "#3a3a42", "#4a4a54"
 FONT = "Segoe UI" if WIN else "TkDefaultFont"
 EMOJI = "Segoe UI Emoji" if WIN else "TkDefaultFont"
 SYMBOL = "Segoe UI Symbol" if WIN else "TkDefaultFont"
 KINDS = (("mic", "\U0001F3A4", "\U0001F3A4", "Microphones"), ("sys", "\U0001F50A", "\U0001F507", "System audio"))
 
 
-class FlatButton(tk.Label):
-    """Label-based flat button with hover state."""
+SCALE = 1.0  # screen DPI / 96, set once the Tk root exists
 
-    def __init__(self, parent, text, command, bg=BG, hover=HOVER, fg=FG, font=None, padx=10, pady=6, **kw):
-        super().__init__(parent, text=text, bg=bg, fg=fg, font=font or (FONT, 10), padx=padx, pady=pady,
-                         cursor="hand2", **kw)
-        self.command, self.base, self.hover, self.fg, self.enabled = command, bg, hover, fg, True
-        self.bind("<Enter>", lambda e: self.enabled and super(FlatButton, self).config(bg=self.hover))
-        self.bind("<Leave>", lambda e: super(FlatButton, self).config(bg=self.base))
-        self.bind("<Button-1>", lambda e: self.enabled and self.command())
 
-    def look(self, bg=None, hover=None, text=None, enabled=True):
-        self.base = bg or self.base
-        self.hover = hover or self.hover
-        self.enabled = enabled
-        super().config(bg=self.base, fg=self.fg if enabled else MUTED, cursor="hand2" if enabled else "arrow",
-                       **({"text": text} if text is not None else {}))
+def px(n):
+    return int(round(n * SCALE))
+
+
+def icon_font():
+    """Windows icon font (Segoe Fluent Icons on 11, MDL2 on 10), or None."""
+    if not WIN:
+        return None
+    fams = set(tkfont.families())
+    return next((f for f in ("Segoe Fluent Icons", "Segoe MDL2 Assets") if f in fams), None)
+
+
+ICON_FONT = None
+# glyph name -> (icon-font char, fallback char)
+GLYPHS = {"close": ("\ue711", "\u2715"), "area": ("\ue7a8", "\u2b1a"), "mic": ("\ue720", "\U0001F3A4"),
+          "sys": ("\ue767", "\U0001F50A"), "sys_off": ("\ue74f", "\U0001F507"), "down": ("\ue70d", "\u25be")}
+
+
+def glyph(name):
+    """(char, font family) for an icon, using the icon font when available."""
+    icon, fallback = GLYPHS[name]
+    return (icon, ICON_FONT) if ICON_FONT else (fallback, EMOJI if name in ("mic", "sys", "sys_off") else SYMBOL)
+
+
+class RoundButton(tk.Canvas):
+    """Canvas-drawn rounded button: optional icon, label and chevron (split click target)."""
+
+    def __init__(self, parent, command, icon=None, label="", chevron=False, fill=None, hover=HOVER, fg=FG,
+                 bold=False, pill=False, min_w=0, on_chevron=None, icon_fg=None):
+        super().__init__(parent, bg=BG, highlightthickness=0, cursor="hand2")
+        self.command, self.on_chevron = command, on_chevron
+        self.icon, self.label, self.chevron = icon, label, chevron
+        self.fill, self.hover, self.fg, self.icon_fg = fill, hover, fg, icon_fg
+        self.pill, self.min_w, self.enabled, self._hover = pill, min_w, True, False
+        self.f_label = tkfont.Font(family=FONT, size=10, weight="bold" if bold else "normal")
+        self.h = px(36)
+        self.bind("<Enter>", lambda e: self._set_hover(True))
+        self.bind("<Leave>", lambda e: self._set_hover(False))
+        self.bind("<Button-1>", self._click)
+        self.relayout()
+
+    def _set_hover(self, v):
+        self._hover = v
+        self.redraw()
+
+    def _click(self, e):
+        if not self.enabled:
+            return
+        if self.chevron and self.on_chevron and e.x >= self._chev_x - px(4):
+            self.on_chevron()
+        else:
+            self.command()
+
+    def relayout(self):
+        pad, gap = px(12), px(8)
+        w = pad
+        self._icon_x = w
+        if self.icon:
+            ch, fam = glyph(self.icon)
+            self.f_icon = tkfont.Font(family=fam, size=12 if fam == EMOJI else 11)
+            w += self.f_icon.measure(ch) + (gap if self.label else 0)
+        self._label_x = w
+        if self.label:
+            w += self.f_label.measure(self.label)
+        self._chev_x = w + (px(10) if self.chevron else 0)
+        if self.chevron:
+            w += px(10) + px(14)
+        natural = w + pad
+        w = max(natural, self.min_w)
+        shift = (w - natural) // 2  # centre the content when the button is wider than it needs
+        self._icon_x += shift
+        self._label_x += shift
+        self._chev_x += shift
+        self.configure(width=w, height=self.h)
+        self.w = w
+        self.redraw()
+
+    def redraw(self):
+        self.delete("all")
+        w, h = self.w, self.h
+        color = self.hover if (self._hover and self.enabled) else self.fill
+        if color:
+            r = h // 2 if self.pill else px(10)
+            x1, y1, x2, y2 = 0, 0, w - 1, h - 1
+            pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
+                   x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+            self.create_polygon(pts, smooth=True, fill=color, outline=color)
+        fg = self.fg if self.enabled else MUTED
+        cy = h // 2
+        if self.icon:
+            ch, _ = glyph(self.icon)
+            self.create_text(self._icon_x, cy, text=ch, font=self.f_icon, fill=self.icon_fg or fg, anchor="w")
+        if self.label:
+            self.create_text(self._label_x, cy, text=self.label, font=self.f_label, fill=fg, anchor="w")
+        if self.chevron:
+            ch, fam = glyph("down")
+            self.create_text(self._chev_x, cy, text=ch, font=(fam, 8 if ICON_FONT else 9), fill=MUTED, anchor="w")
+
+    def look(self, **kw):
+        relayout = any(k in kw and kw[k] != getattr(self, k) for k in ("icon", "label"))
+        for k, v in kw.items():
+            setattr(self, k, v)
+        self.configure(cursor="hand2" if self.enabled else "arrow")
+        self.relayout() if relayout else self.redraw()
 
 
 class Popup:
@@ -574,38 +666,41 @@ class App:
         self.hotkeys = {**DEFAULT_HOTKEYS, **self.cfg.get("hotkeys", {})}
         self.status = tk.StringVar(value="Ready")
 
+        global SCALE, ICON_FONT
+        SCALE = max(1.0, self.root.winfo_fpixels("1i") / 96)
+        ICON_FONT = icon_font()
+
         outer = tk.Frame(self.root, bg=BG)
         outer.pack(fill="both", expand=True)
         row = tk.Frame(outer, bg=BG)
-        row.pack(padx=8, pady=(8, 2))
+        row.pack(padx=px(10), pady=(px(10), px(2)))
 
         def sep():
-            f = tk.Frame(row, bg=BORDER_LINE, width=1)
-            f.pack(side="left", fill="y", padx=6, pady=4)
+            f = tk.Frame(row, bg=BORDER_LINE, width=1, height=px(22))
+            f.pack(side="left", padx=px(8))
             return f
 
+        def add(btn, **kw):
+            btn.pack(side="left", padx=px(2), **kw)
+            return btn
+
         if WIN:
-            FlatButton(row, "\u2715", self.on_close, hover="#5a2a2e", fg=MUTED, font=(SYMBOL, 10), padx=9).pack(side="left")
+            add(RoundButton(row, self.on_close, icon="close", fg=MUTED, hover="#4a2a30", min_w=px(36)))
             sep()
-        self.area_btn = FlatButton(row, "\u2b1a  Area", self.on_select, font=(SYMBOL, 10))
-        self.area_btn.pack(side="left")
-        self.groups = {}  # kind -> (frame, toggle, dropdown)
-        for kind, _on, _off, _title in KINDS:
-            g = tk.Frame(row, bg=BG)
-            tb = FlatButton(g, _on, lambda k=kind: self.toggle_kind(k), font=(EMOJI, 11), padx=8)
-            dd = FlatButton(g, "\u25be", lambda k=kind: self.show_kind_menu(k, self.groups[k][2]),
-                            font=(SYMBOL, 9), padx=4)
-            tb.pack(side="left")
-            dd.pack(side="left")
-            self.groups[kind] = (g, tb, dd)
+        self.area_btn = add(RoundButton(row, self.on_select, icon="area", label="Area"))
+        self.groups = {}  # kind -> one split button: icon toggles, chevron opens the device list
+        for kind, _t in (("mic", "Microphones"), ("sys", "System audio")):
+            btn = RoundButton(row, lambda k=kind: self.toggle_kind(k), icon=kind, chevron=True,
+                              on_chevron=lambda k=kind: self.show_kind_menu(k, self.groups[k]))
+            self.groups[kind] = btn
         self.sep2 = sep()
-        self.opt_btn = FlatButton(row, "Options  \u25be", self.show_options)
-        self.opt_btn.pack(side="left", padx=(0, 6))
-        self.rec_btn = FlatButton(row, "\u25cf  Record", self.on_record_click, bg=ACCENT, hover=ACCENT_HOVER,
-                                  fg="white", font=(FONT, 10, "bold"), width=11)
-        self.rec_btn.pack(side="left")
+        self.opt_btn = add(RoundButton(row, self.show_options, label="Options", chevron=True,
+                                       on_chevron=self.show_options))
+        self.rec_btn = RoundButton(row, self.on_record_click, icon=None, label="Record", fill=ACCENT,
+                                   hover=ACCENT_HOVER, fg="white", bold=True, pill=True, min_w=px(120))
+        self.rec_btn.pack(side="left", padx=(px(6), px(2)))
         self.status_lbl = tk.Label(outer, textvariable=self.status, bg=BG, fg=MUTED, font=(FONT, 8), width=1)
-        self.status_lbl.pack(fill="x", padx=8, pady=(0, 6))
+        self.status_lbl.pack(fill="x", padx=px(10), pady=(0, px(8)))
         self.status_lbl.bind("<Button-1>", lambda e: self.open_folder())
         for wdg in (outer, row, self.status_lbl):  # drag the toolbar by any empty area
             wdg.bind("<ButtonPress-1>", self._drag_start, add="+")
@@ -769,16 +864,16 @@ class App:
                         print("Audio switch error:", e)
 
     def sync_bar_audio(self):
-        for kind, on_icon, off_icon, _title in KINDS:
-            g, tb, dd = self.groups[kind]
+        for kind, btn in self.groups.items():
             keys = [d["key"] for d in self.audio_devs if d["kind"] == kind]
             if not keys:
-                g.pack_forget()
+                btn.pack_forget()
                 continue
             on = any(k in self.audio_selected for k in keys)
-            tb.look(bg=ON if on else OFF, hover="#3fb85f" if on else HOVER, text=on_icon if on else off_icon)
-            dd.look(bg=ON if on else OFF, hover="#3fb85f" if on else HOVER)
-            g.pack(side="left", padx=3, before=self.sep2)
+            icon = kind if on or kind == "mic" else "sys_off"
+            btn.look(icon=icon, fill=ON_FILL if on else None, hover=ON_HOVER if on else HOVER,
+                     icon_fg=ON_FG if on else MUTED, fg=FG)
+            btn.pack(side="left", padx=px(2), before=self.sep2)
         self.dock()
 
     def toggle_kind(self, kind):
@@ -1025,14 +1120,15 @@ class App:
     def _render_state(self):
         if self.state == "countdown":
             left = max(0, int(self.delay_s - (time.time() - self.t0) + 0.999))
-            self.rec_btn.look(bg="#4a4a50", hover="#4a4a50", text=f"{left}", enabled=False)
+            self.rec_btn.look(fill=NEUTRAL, hover=NEUTRAL, label=f"Starting in {left}", enabled=False)
         elif self.state == "recording":
             e = int(time.time() - self.t0)
-            self.rec_btn.look(bg="#4a4a50", hover="#5e5e66", text=f"\u25a0  {e // 60:02d}:{e % 60:02d}")
+            self.rec_btn.look(fill=NEUTRAL, hover=NEUTRAL_HOVER, label=f"\u25a0   {e // 60:02d}:{e % 60:02d}",
+                              enabled=True)
         elif self.state == "stopping":
-            self.rec_btn.look(bg="#4a4a50", hover="#4a4a50", text="Saving...", enabled=False)
+            self.rec_btn.look(fill=NEUTRAL, hover=NEUTRAL, label="Saving...", enabled=False)
         else:
-            self.rec_btn.look(bg=ACCENT, hover=ACCENT_HOVER, text="\u25cf  Record")
+            self.rec_btn.look(fill=ACCENT, hover=ACCENT_HOVER, label="Record", enabled=True)
         self.area_btn.look(enabled=self.state == "idle")
 
     def on_record_click(self):
