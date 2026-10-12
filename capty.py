@@ -116,34 +116,68 @@ def list_audio_devices():
 
 
 class WinAudioRecorder:
-    """Records each chosen source to its own WAV (silence-padded so it stays on the video timeline)."""
+    """Records each source to its own WAV (silence-padded so it stays on the video timeline).
+
+    Sources can be switched on/off at any time: a disabled source's stream is closed (so a mic is really
+    released) and the gap is filled with silence when it is enabled again.
+    """
 
     def __init__(self, devices, base):
-        self.devices = devices
+        self.devices = {d["key"]: d for d in devices}
         self.base = base
-        self.streams = []  # (stream, wavefile, state, path)
+        self.srcs = {}  # key -> {wf, st, path, stream}
+        self.lock = threading.Lock()
+        self.p = None
+        self.t0 = None
 
-    def start(self):
+    def start(self, keys):
         self.p = pyaudio.PyAudio()
         self.t0 = time.time()
-        for n, dev in enumerate(self.devices):
-            path = f"{self.base}_audio{n}.wav"
-            try:
+        self.apply(keys)
+
+    def apply(self, keys):
+        """Open streams for `keys`, close the rest. No-op until start() was called."""
+        with self.lock:
+            if self.p is None:
+                return
+            for key, dev in self.devices.items():
+                src = self.srcs.get(key)
+                if key in keys:
+                    if not src or not src["stream"]:
+                        self._open(key, dev, src)
+                elif src and src["stream"]:
+                    self._close_stream(src)
+
+    def _open(self, key, dev, src):
+        try:
+            if not src:
+                path = f"{self.base}_audio{len(self.srcs)}.wav"
                 wf = wave.open(path, "wb")
                 wf.setnchannels(dev["channels"])
                 wf.setsampwidth(2)
                 wf.setframerate(dev["rate"])
-                st = {"written": 0, "rate": dev["rate"], "ch": dev["channels"]}
-                stream = self.p.open(format=pyaudio.paInt16, channels=dev["channels"], rate=dev["rate"],
-                                     input=True, input_device_index=dev["index"], frames_per_buffer=1024,
-                                     stream_callback=self._callback(wf, st))
-                self.streams.append((stream, wf, st, path))
-            except Exception as e:
-                print(f"Audio source {dev['label']} failed:", e)
+                src = {"wf": wf, "path": path, "stream": None,
+                       "st": {"written": 0, "rate": dev["rate"], "ch": dev["channels"]}}
+                self.srcs[key] = src
+            src["stream"] = self.p.open(format=pyaudio.paInt16, channels=dev["channels"], rate=dev["rate"],
+                                        input=True, input_device_index=dev["index"], frames_per_buffer=1024,
+                                        stream_callback=self._callback(src))
+        except Exception as e:
+            print(f"Audio source {dev['label']} failed:", e)
 
-    def _callback(self, wf, st):
+    @staticmethod
+    def _close_stream(src):
+        try:
+            src["stream"].stop_stream()
+            src["stream"].close()
+        finally:
+            src["stream"] = None
+
+    def _callback(self, src):
+        wf, st = src["wf"], src["st"]
+
         def cb(data, frames, _ti, _status):
-            # loopback delivers nothing while silent: fill the gap so audio stays in sync
+            # loopback delivers nothing while silent, and a re-enabled source has a gap: fill with silence
             gap = int((time.time() - self.t0) * st["rate"]) - st["written"] - frames
             if gap > st["rate"] // 5:
                 wf.writeframes(bytes(gap * st["ch"] * 2))
@@ -154,22 +188,26 @@ class WinAudioRecorder:
         return cb
 
     def stop(self):
-        """Returns the WAV paths that were recorded."""
-        total = time.time() - self.t0
-        paths = []
-        for stream, wf, st, path in self.streams:
-            try:
-                stream.stop_stream()
-                stream.close()
-                deficit = int(total * st["rate"]) - st["written"]
-                if deficit > 0:
-                    wf.writeframes(bytes(deficit * st["ch"] * 2))
-            finally:
-                wf.close()
-            paths.append(path)
-        self.streams = []
-        self.p.terminate()
-        return paths
+        """Close everything; returns the WAV paths that were recorded."""
+        with self.lock:
+            if self.p is None:
+                return []
+            total = time.time() - self.t0
+            paths = []
+            for src in self.srcs.values():
+                try:
+                    if src["stream"]:
+                        self._close_stream(src)
+                    st = src["st"]
+                    deficit = int(total * st["rate"]) - st["written"]
+                    if deficit > 0:
+                        src["wf"].writeframes(bytes(deficit * st["ch"] * 2))
+                finally:
+                    src["wf"].close()
+                paths.append(src["path"])
+            self.p.terminate()
+            self.p = None
+            return paths
 
 
 def video_duration(path):
@@ -375,21 +413,50 @@ class ControlBar:
     """Small floating Record/Stop bar docked next to the selection (outside the captured area)."""
     GAP = 8
 
-    def __init__(self, root, on_click):
+    KINDS = (("mic", "\U0001F3A4 Mic"), ("sys", "\U0001F50A System"))
+
+    def __init__(self, root, on_click, on_toggle, on_menu):
         self.win = tk.Toplevel(root)
         self.win.overrideredirect(True)
         self.win.attributes("-topmost", True)
         self.win.configure(bg="#202020")
         self.win.withdraw()
+        self.rect = None
         self.btn = tk.Button(self.win, text="● Record", command=on_click, bg="#d9232d", fg="white",
                              activebackground="#ff3b45", activeforeground="white", relief="flat",
                              font=("Segoe UI" if WIN else "TkDefaultFont", 10, "bold"), padx=12, pady=4, bd=0)
         self.btn.pack(side="left", padx=(8, 6), pady=8)
         self.label = tk.Label(self.win, text="", bg="#202020", fg="white", width=7,
                               font=("Segoe UI" if WIN else "TkDefaultFont", 10))
-        self.label.pack(side="left", padx=(0, 10))
+        self.label.pack(side="left", padx=(0, 6))
+        font = ("Segoe UI Emoji" if WIN else "TkDefaultFont", 10)
+        self.groups = {}  # kind -> (frame, toggle button, menu button)
+        for kind, text in self.KINDS:
+            g = tk.Frame(self.win, bg="#202020")
+            tb = tk.Button(g, text=text, command=lambda k=kind: on_toggle(k), relief="flat", bd=0,
+                           font=font, padx=8, pady=4, fg="white")
+            mb = tk.Button(g, text="\u25be", relief="flat", bd=0, font=font, padx=4, pady=4, fg="white",
+                           bg="#333333", activebackground="#555555", activeforeground="white")
+            mb.config(command=lambda k=kind, w=mb: on_menu(k, w))
+            tb.pack(side="left")
+            mb.pack(side="left", padx=(1, 0))
+            self.groups[kind] = (g, tb, mb)
+        self.sync_audio({})
+
+    def sync_audio(self, states):
+        """states: {kind: is_on} for kinds that have devices; kinds missing are hidden."""
+        for kind, (g, tb, _mb) in self.groups.items():
+            if kind in states:
+                on = states[kind]
+                tb.config(bg="#2e7d32" if on else "#555555", activebackground="#388e3c" if on else "#6a6a6a",
+                          activeforeground="white", text=dict(self.KINDS)[kind] + (" on" if on else " off"))
+                g.pack(side="left", padx=(0, 6))
+            else:
+                g.pack_forget()
         self.win.update_idletasks()
         self.size = (self.win.winfo_reqwidth(), self.win.winfo_reqheight())
+        if self.win.winfo_viewable():
+            self.show(self.rect)
 
     def _bounds(self, rect):
         """Screen rect containing the selection's center."""
@@ -402,6 +469,7 @@ class ControlBar:
         return 0, 0, self.win.winfo_screenwidth(), self.win.winfo_screenheight()
 
     def show(self, rect):
+        self.rect = rect
         x, y, w, h = rect
         bw, bh = self.size
         mx, my, mw, mh = self._bounds(rect)
@@ -445,7 +513,11 @@ class App:
         self.out_mp4 = self.out_gif = self.palette = None
         self.overlay = Overlay(self.root)
         self.state = "idle"  # idle | countdown | recording | stopping
-        self.bar = ControlBar(self.root, self.on_bar_click)
+        self.audio_selected = set()
+        self.win_audio = None  # live Windows recorder while a recording is in progress
+        self.lin_audio = {}  # Linux: ffmpeg filter index -> (device key, enabled)
+        self.last_kind = {}  # kind -> keys that were on before the bar switched it off
+        self.bar = ControlBar(self.root, self.on_bar_click, self.toggle_kind, self.show_kind_menu)
 
         f = ttk.Frame(self.root, padding=10)
         f.pack()
@@ -588,14 +660,65 @@ class App:
         chosen = set(self.cfg.get("audio", [])) | {k for k, v in self.audio_vars.items() if v.get()}
         self.audio_devs = list_audio_devices()
         self.audio_vars = {d["key"]: tk.BooleanVar(value=d["key"] in chosen) for d in self.audio_devs}
+        for v in self.audio_vars.values():
+            v.trace_add("write", lambda *_: self.on_audio_change())
         if WIN and not pyaudio:
             ttk.Label(self.audio_frame, text="No audio: pip install PyAudioWPatch").pack(anchor="w")
         elif not self.audio_devs:
             ttk.Label(self.audio_frame, text="No audio devices found").pack(anchor="w")
         for d in self.audio_devs:
-            ttk.Checkbutton(self.audio_frame, text=d["label"], variable=self.audio_vars[d["key"]],
-                            command=self.save_settings).pack(anchor="w")
+            ttk.Checkbutton(self.audio_frame, text=d["label"], variable=self.audio_vars[d["key"]]).pack(anchor="w")
         ttk.Button(self.audio_frame, text="Refresh devices", command=self.refresh_audio).pack(anchor="w", pady=(4, 0))
+        self.audio_selected = {k for k, v in self.audio_vars.items() if v.get()}
+        self.sync_bar_audio()
+
+    def on_audio_change(self):
+        """A source was switched on/off (main window, bar or menu); applies live while recording."""
+        old = self.audio_selected
+        self.audio_selected = {k for k, v in self.audio_vars.items() if v.get()}
+        if self.audio_selected == old:
+            return
+        self.save_settings()
+        self.sync_bar_audio()
+        if self.win_audio:
+            self.win_audio.apply(self.audio_selected)
+        elif self.lin_audio and self.ffproc:
+            for i, (key, was) in list(self.lin_audio.items()):
+                want = key in self.audio_selected
+                if want != was:
+                    try:  # ffmpeg's interactive command: retune the volume filter of that input
+                        self.ffproc.stdin.write(f"cvolume@a{i} -1 volume {int(want)}\n".encode())
+                        self.ffproc.stdin.flush()
+                        self.lin_audio[i] = (key, want)
+                    except OSError as e:
+                        print("Audio switch error:", e)
+
+    def sync_bar_audio(self):
+        states = {}
+        for kind in ("mic", "sys"):
+            keys = [d["key"] for d in self.audio_devs if d["kind"] == kind]
+            if keys:
+                states[kind] = any(k in self.audio_selected for k in keys)
+        self.bar.sync_audio(states)
+
+    def toggle_kind(self, kind):
+        """Bar button: switch all mics / all system audio off, or back to what was on (default: first device)."""
+        keys = [d["key"] for d in self.audio_devs if d["kind"] == kind]
+        on = [k for k in keys if k in self.audio_selected]
+        if on:
+            self.last_kind[kind] = on
+            target = set()
+        else:
+            target = set(self.last_kind.get(kind) or keys[:1])
+        for k in keys:
+            self.audio_vars[k].set(k in target)
+
+    def show_kind_menu(self, kind, widget):
+        menu = tk.Menu(self.root, tearoff=0)
+        for d in self.audio_devs:
+            if d["kind"] == kind:
+                menu.add_checkbutton(label=d["label"].split(": ", 1)[1], variable=self.audio_vars[d["key"]])
+        menu.tk_popup(widget.winfo_rootx(), widget.winfo_rooty() + widget.winfo_height())
 
     def save_settings(self):
         try:
@@ -691,19 +814,25 @@ class App:
                 display += ".0"
             grab = ["-f", "x11grab", "-framerate", str(fps),
                     "-video_size", f"{w}x{h}", "-i", f"{display}+{x},{y}"]
-        audio = [] if to_gif else [d for d in self.audio_devs if self.audio_vars[d["key"]].get()]
         audio_in, audio_out = [], []
-        if audio and not WIN:  # PulseAudio sources go straight into the same ffmpeg
-            for d in audio:
+        use_audio = not to_gif and bool(self.audio_devs)
+        self.lin_audio = {}
+        win_audio = None
+        if use_audio and WIN and pyaudio:
+            win_audio = WinAudioRecorder(self.audio_devs, os.path.splitext(self.out_mp4)[0])
+        elif use_audio and not WIN and self.audio_selected:
+            # ffmpeg can't add inputs mid-recording, so every source is wired in and gated with a volume filter
+            devs = self.audio_devs
+            chains = []
+            for i, d in enumerate(devs):
                 audio_in += ["-f", "pulse", "-i", d["name"]]
-            if len(audio) == 1:
-                audio_out = ["-map", "0:v", "-map", "1:a"]
-            else:
-                ins = "".join(f"[{i + 1}:a]" for i in range(len(audio)))
-                audio_out = ["-filter_complex", f"{ins}amix=inputs={len(audio)}:duration=longest:normalize=0[a]",
-                             "-map", "0:v", "-map", "[a]"]
-            audio_out += ["-c:a", "aac", "-b:a", "192k", "-ac", "2"]
-        win_audio = WinAudioRecorder(audio, os.path.splitext(self.out_mp4)[0]) if audio and WIN else None
+                on = d["key"] in self.audio_selected
+                chains.append(f"[{i + 1}:a]volume@a{i}={int(on)}[s{i}]")
+                self.lin_audio[i] = (d["key"], on)
+            mix = "".join(f"[s{i}]" for i in range(len(devs))) + f"amix=inputs={len(devs)}:duration=longest:normalize=0[a]"
+            audio_out = ["-filter_complex", ";".join(chains + [mix]), "-map", "0:v", "-map", "[a]",
+                         "-c:a", "aac", "-b:a", "192k", "-ac", "2"]
+        self.win_audio = None
         cmd = [
             "ffmpeg", "-y", *grab, *audio_in,
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
@@ -726,13 +855,15 @@ class App:
                     stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
                 self.root.after(0, self._rec_started)
                 if win_audio:
-                    win_audio.start()
+                    win_audio.start(self.audio_selected)
+                    self.win_audio = win_audio
                 self.ffproc.wait()
+                self.win_audio = None
                 self.ffproc = None
                 if win_audio:
                     self.set_status("Adding audio...")
                     try:
-                        wavs = win_audio.stop() if win_audio.streams else []
+                        wavs = win_audio.stop()
                         if wavs:
                             # ffmpeg takes a moment to start grabbing; skip the audio recorded before the video began
                             video_start = self.t_stop - video_duration(self.out_mp4)

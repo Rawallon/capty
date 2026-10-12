@@ -35,6 +35,8 @@ Uses FFmpeg `gdigrab` (no slop needed); same `capty.py` as Linux. Hotkeys are gl
 ### Audio
 Pick which audio ends up in the MP4: tick any combination of **system audio** (what your PC plays, one entry per output device) and **microphones** (one entry per plugged-in mic); they're mixed together. Nothing is recorded by default. Use **Refresh devices** after plugging in a mic. GIFs have no audio.
 
+The floating bar has **Mic** and **System** buttons to flip each on/off, and a ▾ next to them to choose which device(s), including while recording. A switched-off mic is fully released. On Linux, live switching needs at least one source ticked when you press Record (ffmpeg can't add inputs mid-recording).
+
 - Windows: `pip install PyAudioWPatch` (WASAPI loopback for system audio).
 - Linux: needs PulseAudio/PipeWire and `pactl` (`pulseaudio-utils`).
 
