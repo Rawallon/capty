@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, simpledialog
 
 WIN = sys.platform == "win32"
 if WIN:
@@ -409,96 +409,136 @@ class Overlay:
             w.withdraw()
 
 
-class ControlBar:
-    """Small floating Record/Stop bar docked next to the selection (outside the captured area)."""
-    GAP = 8
+BG, BORDER_LINE, FG, MUTED = "#1e1e22", "#3a3a40", "#f2f2f7", "#9a9aa3"
+HOVER, ACCENT, ACCENT_HOVER, ON, OFF = "#34343a", "#ff453a", "#ff6259", "#30a14e", BG
+FONT = "Segoe UI" if WIN else "TkDefaultFont"
+EMOJI = "Segoe UI Emoji" if WIN else "TkDefaultFont"
+SYMBOL = "Segoe UI Symbol" if WIN else "TkDefaultFont"
+KINDS = (("mic", "\U0001F3A4", "\U0001F3A4", "Microphones"), ("sys", "\U0001F50A", "\U0001F507", "System audio"))
 
-    KINDS = (("mic", "🎤", "🎤"), ("sys", "🔊", "🔇"))  # (kind, icon on, icon off)
 
-    def __init__(self, root, on_click, on_toggle, on_menu):
-        self.win = tk.Toplevel(root)
-        self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.configure(bg="#202020")
-        self.win.withdraw()
-        self.rect = None
-        self.btn = tk.Button(self.win, text="● Record", command=on_click, bg="#d9232d", fg="white",
-                             activebackground="#ff3b45", activeforeground="white", relief="flat",
-                             font=("Segoe UI" if WIN else "TkDefaultFont", 10, "bold"), padx=12, pady=4, bd=0)
-        self.btn.pack(side="left", padx=(8, 6), pady=8)
-        self.label = tk.Label(self.win, text="", bg="#202020", fg="white", width=7,
-                              font=("Segoe UI" if WIN else "TkDefaultFont", 10))
-        self.label.pack(side="left", padx=(0, 6))
-        font = ("Segoe UI Emoji" if WIN else "TkDefaultFont", 10)
-        self.groups = {}  # kind -> (frame, toggle button, menu button)
-        for kind, text, _off in self.KINDS:
-            g = tk.Frame(self.win, bg="#202020")
-            tb = tk.Button(g, text=text, command=lambda k=kind: on_toggle(k), relief="flat", bd=0,
-                           font=font, padx=8, pady=4, fg="white")
-            mb = tk.Button(g, text="\u25be", relief="flat", bd=0, font=font, padx=4, pady=4, fg="white",
-                           bg="#333333", activebackground="#555555", activeforeground="white")
-            mb.config(command=lambda k=kind, w=mb: on_menu(k, w))
-            tb.pack(side="left")
-            mb.pack(side="left", padx=(1, 0))
-            self.groups[kind] = (g, tb, mb)
-        self.sync_audio({})
+class FlatButton(tk.Label):
+    """Label-based flat button with hover state."""
 
-    def sync_audio(self, states):
-        """states: {kind: is_on} for kinds that have devices; kinds missing are hidden."""
-        icons = {k: (on, off) for k, on, off in self.KINDS}
-        for kind, (g, tb, _mb) in self.groups.items():
-            if kind in states:
-                on = states[kind]
-                tb.config(bg="#2e7d32" if on else "#555555", activebackground="#388e3c" if on else "#6a6a6a",
-                          activeforeground="white", text=icons[kind][0 if on else 1])
-                g.pack(side="left", padx=(0, 6))
+    def __init__(self, parent, text, command, bg=BG, hover=HOVER, fg=FG, font=None, padx=10, pady=6, **kw):
+        super().__init__(parent, text=text, bg=bg, fg=fg, font=font or (FONT, 10), padx=padx, pady=pady,
+                         cursor="hand2", **kw)
+        self.command, self.base, self.hover, self.fg, self.enabled = command, bg, hover, fg, True
+        self.bind("<Enter>", lambda e: self.enabled and super(FlatButton, self).config(bg=self.hover))
+        self.bind("<Leave>", lambda e: super(FlatButton, self).config(bg=self.base))
+        self.bind("<Button-1>", lambda e: self.enabled and self.command())
+
+    def look(self, bg=None, hover=None, text=None, enabled=True):
+        self.base = bg or self.base
+        self.hover = hover or self.hover
+        self.enabled = enabled
+        super().config(bg=self.base, fg=self.fg if enabled else MUTED, cursor="hand2" if enabled else "arrow",
+                       **({"text": text} if text is not None else {}))
+
+
+class Popup:
+    """Dark dropdown menu. items: ('header', text) | ('sep',) | ('item', text, checked, callback, keep_open)."""
+
+    def __init__(self, app):
+        self.app, self.win, self.anchor, self.build = app, None, None, None
+        app.root.bind_all("<Button-1>", self._on_click, add="+")
+        app.root.bind("<Escape>", lambda e: self.close(), add="+")
+
+    def toggle(self, anchor, build):
+        if self.win and self.anchor is anchor:
+            return self.close()
+        self.close()
+        self.anchor, self.build = anchor, build
+        self._render()
+
+    def close(self):
+        if self.win:
+            self.win.destroy()
+        self.win = self.anchor = None
+
+    def _on_click(self, e):
+        if self.win and e.widget is not self.anchor and not str(e.widget).startswith(str(self.win)):
+            self.close()
+
+    def _render(self):
+        if self.win:
+            self.win.destroy()
+        w = tk.Toplevel(self.app.root)
+        w.overrideredirect(True)
+        w.attributes("-topmost", True)
+        w.configure(bg=BORDER_LINE)
+        inner = tk.Frame(w, bg=BG)
+        inner.pack(padx=1, pady=1, fill="both")
+        cols = [[]]
+        for item in self.build():
+            if item[0] == "col":
+                cols.append([])
             else:
-                g.pack_forget()
-        self.win.update_idletasks()
-        self.size = (self.win.winfo_reqwidth(), self.win.winfo_reqheight())
-        if self.win.winfo_viewable():
-            self.show(self.rect)
+                cols[-1].append(item)
+        for items in cols:
+            col = tk.Frame(inner, bg=BG)
+            col.pack(side="left", anchor="n")
+            tk.Frame(col, bg=BG, width=230, height=1).pack()
+            self._fill(col, items)
+            tk.Frame(col, bg=BG, height=4).pack()
+        w.update_idletasks()
+        a = self.anchor
+        rw, rh = w.winfo_reqwidth(), w.winfo_reqheight()
+        mx, my, mw, mh = screen_for((a.winfo_rootx(), a.winfo_rooty(), 1, 1))
+        x = min(a.winfo_rootx(), mx + mw - rw)
+        y = a.winfo_rooty() + a.winfo_height() + 4
+        if y + rh > my + mh:  # no room below: open upwards
+            y = a.winfo_rooty() - rh - 4
+        self.win = w
+        place(w, x, max(y, my), rw, rh)
 
-    def _bounds(self, rect):
-        """Screen rect containing the selection's center."""
-        x, y, w, h = rect
-        cx, cy = x + w // 2, y + h // 2
-        if WIN:
-            for mx, my, mw, mh in monitors():
-                if mx <= cx < mx + mw and my <= cy < my + mh:
-                    return mx, my, mw, mh
-        return 0, 0, self.win.winfo_screenwidth(), self.win.winfo_screenheight()
+    def _fill(self, inner, items):
+        for item in items:
+            kind = item[0]
+            if kind == "header":
+                tk.Label(inner, text=item[1], bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").pack(
+                    fill="x", padx=14, pady=(8, 2))
+            elif kind == "sep":
+                tk.Frame(inner, bg=BORDER_LINE, height=1).pack(fill="x", pady=4)
+            else:
+                _, text, checked, cb, keep = item
+                row = tk.Frame(inner, bg=BG, cursor="hand2")
+                row.pack(fill="x")
+                mark = tk.Label(row, text="\u2713" if checked else "", bg=BG, fg=FG, font=(SYMBOL, 10), width=2)
+                mark.pack(side="left", padx=(8, 0), pady=3)
+                lab = tk.Label(row, text=text, bg=BG, fg=FG, font=(FONT, 10), anchor="w")
+                lab.pack(side="left", fill="x", expand=True, padx=(0, 16))
+                for wdg in (row, mark, lab):
+                    wdg.bind("<Enter>", lambda e, r=row, m=mark, l=lab: [x.config(bg=HOVER) for x in (r, m, l)])
+                    wdg.bind("<Leave>", lambda e, r=row, m=mark, l=lab: [x.config(bg=BG) for x in (r, m, l)])
+                    wdg.bind("<Button-1>", lambda e, cb=cb, keep=keep: self._pick(cb, keep))
 
-    def show(self, rect):
-        self.rect = rect
-        x, y, w, h = rect
-        bw, bh = self.size
-        mx, my, mw, mh = self._bounds(rect)
-        px = min(max(x + w - bw, mx), mx + mw - bw)  # right-aligned with the selection, kept on screen
-        below = y + h + BORDER + self.GAP
-        above = y - BORDER - self.GAP - bh
-        if below + bh <= my + mh:
-            py = below
-        elif above >= my:
-            py = above
+    def _pick(self, cb, keep):
+        if keep:
+            if cb:
+                cb()
+            if self.win:
+                self._render()
         else:
-            py = my + mh - bh - self.GAP  # no room outside: dock inside the bottom edge
-        self.win.deiconify()
-        place(self.win, px, py, bw, bh)
+            self.close()
+            if cb:
+                cb()
 
-    def hide(self):
-        self.win.withdraw()
 
-    def update(self, state, text=""):
-        if state == "recording":
-            self.btn.config(text="■ Stop", bg="#444444", activebackground="#666666", state="normal")
-        elif state == "countdown":
-            self.btn.config(text="● Record", bg="#d9232d", state="disabled")
-        elif state == "stopping":
-            self.btn.config(text="Saving...", bg="#444444", state="disabled")
-        else:
-            self.btn.config(text="● Record", bg="#d9232d", activebackground="#ff3b45", state="normal")
-        self.label.config(text=text)
+def screen_for(rect):
+    """(x, y, w, h) of the monitor containing the rect's center."""
+    x, y, w, h = rect
+    cx, cy = x + w // 2, y + h // 2
+    if WIN:
+        for mx, my, mw, mh in monitors():
+            if mx <= cx < mx + mw and my <= cy < my + mh:
+                return mx, my, mw, mh
+    root = tk._default_root
+    return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+
+
+def fmt_hotkey(combo):
+    return "+".join(p.upper() if len(p) == 1 else p.capitalize() for p in combo.split("+"))
 
 
 class App:
@@ -507,10 +547,15 @@ class App:
         self.root.title("Capty")
         self.root.resizable(False, False)
         self.root.attributes("-topmost", True)
+        self.root.configure(bg=BG)
+        if WIN:
+            self.root.overrideredirect(True)  # borderless toolbar; docks next to the selection
 
         self.cfg = load_config()
         self.selected = None
+        self.manual_pos = False
         self.ffproc = None
+        self.last_saved = None
         self.out_mp4 = self.out_gif = self.palette = None
         self.overlay = Overlay(self.root)
         self.state = "idle"  # idle | countdown | recording | stopping
@@ -518,76 +563,115 @@ class App:
         self.win_audio = None  # live Windows recorder while a recording is in progress
         self.lin_audio = {}  # Linux: ffmpeg filter index -> (device key, enabled)
         self.last_kind = {}  # kind -> keys that were on before the bar switched it off
-        self.bar = ControlBar(self.root, self.on_bar_click, self.toggle_kind, self.show_kind_menu)
+        self.popup = Popup(self)
 
-        f = ttk.Frame(self.root, padding=10)
-        f.pack()
-
-        row = ttk.Frame(f)
-        row.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        self.select_btn = ttk.Button(row, text="Select area", command=self.on_select)
-        self.select_btn.pack(side="left", expand=True, fill="x", padx=(0, 4))
-        self.clear_btn = ttk.Button(row, text="Clear", command=self.on_clear, state="disabled")
-        self.clear_btn.pack(side="left", expand=True, fill="x")
-
-        ttk.Label(f, text="Filename:").grid(row=2, column=0, sticky="w")
-        self.fname = tk.StringVar(value=time.strftime("capture--%Y-%m-%d-%H-%M-%S"))
-        ttk.Entry(f, textvariable=self.fname).grid(row=2, column=1, columnspan=2, sticky="ew", pady=2)
-
-        ttk.Label(f, text="Save to:").grid(row=2, column=0, sticky="w")
         self.outdir = tk.StringVar(value=self.cfg.get("outdir") or DEFAULT_DIR)
-        ttk.Entry(f, textvariable=self.outdir, width=34).grid(row=2, column=1, sticky="ew", pady=2)
-        ttk.Button(f, text="Browse...", command=self.on_browse).grid(row=2, column=2, padx=(4, 0))
-
-        ttk.Label(f, text="Delay (s):").grid(row=3, column=0, sticky="w")
         self.delay = tk.IntVar(value=self.cfg.get("delay", 3))
-        ttk.Spinbox(f, from_=0, to=60, textvariable=self.delay, width=6).grid(row=3, column=1, sticky="w", pady=2)
-
-        ttk.Label(f, text="Format:").grid(row=4, column=0, sticky="w")
         self.fmt = tk.StringVar(value=self.cfg.get("format", "mp4"))
-        fr = ttk.Frame(f)
-        fr.grid(row=4, column=1, columnspan=2, sticky="w", pady=2)
-        ttk.Radiobutton(fr, text="MP4 (video)", variable=self.fmt, value="mp4").pack(side="left")
-        ttk.Radiobutton(fr, text="GIF (animated)", variable=self.fmt, value="gif").pack(side="left", padx=(8, 0))
-
-        ttk.Label(f, text="FPS:").grid(row=5, column=0, sticky="w")
         self.fps = tk.IntVar(value=self.cfg.get("fps", 30))
-        ttk.Spinbox(f, from_=1, to=240, textvariable=self.fps, width=6).grid(row=5, column=1, sticky="w", pady=2)
+        self.prefix = tk.StringVar(value=self.cfg.get("prefix", "capture"))
+        self.pointer = tk.BooleanVar(value=self.cfg.get("pointer", True))
+        self.hotkeys = {**DEFAULT_HOTKEYS, **self.cfg.get("hotkeys", {})}
+        self.status = tk.StringVar(value="Ready")
 
-        ttk.Label(f, text="Audio:").grid(row=6, column=0, sticky="nw")
-        self.audio_frame = ttk.Frame(f)
-        self.audio_frame.grid(row=6, column=1, columnspan=2, sticky="w", pady=2)
+        outer = tk.Frame(self.root, bg=BG)
+        outer.pack(fill="both", expand=True)
+        row = tk.Frame(outer, bg=BG)
+        row.pack(padx=8, pady=(8, 2))
+
+        def sep():
+            f = tk.Frame(row, bg=BORDER_LINE, width=1)
+            f.pack(side="left", fill="y", padx=6, pady=4)
+            return f
+
+        if WIN:
+            FlatButton(row, "\u2715", self.on_close, hover="#5a2a2e", fg=MUTED, font=(SYMBOL, 10), padx=9).pack(side="left")
+            sep()
+        self.area_btn = FlatButton(row, "\u2b1a  Area", self.on_select, font=(SYMBOL, 10))
+        self.area_btn.pack(side="left")
+        self.groups = {}  # kind -> (frame, toggle, dropdown)
+        for kind, _on, _off, _title in KINDS:
+            g = tk.Frame(row, bg=BG)
+            tb = FlatButton(g, _on, lambda k=kind: self.toggle_kind(k), font=(EMOJI, 11), padx=8)
+            dd = FlatButton(g, "\u25be", lambda k=kind: self.show_kind_menu(k, self.groups[k][2]),
+                            font=(SYMBOL, 9), padx=4)
+            tb.pack(side="left")
+            dd.pack(side="left")
+            self.groups[kind] = (g, tb, dd)
+        self.sep2 = sep()
+        self.opt_btn = FlatButton(row, "Options  \u25be", self.show_options)
+        self.opt_btn.pack(side="left", padx=(0, 6))
+        self.rec_btn = FlatButton(row, "\u25cf  Record", self.on_record_click, bg=ACCENT, hover=ACCENT_HOVER,
+                                  fg="white", font=(FONT, 10, "bold"), width=11)
+        self.rec_btn.pack(side="left")
+        self.status_lbl = tk.Label(outer, textvariable=self.status, bg=BG, fg=MUTED, font=(FONT, 8), width=1)
+        self.status_lbl.pack(fill="x", padx=8, pady=(0, 6))
+        self.status_lbl.bind("<Button-1>", lambda e: self.open_folder())
+        for wdg in (outer, row, self.status_lbl):  # drag the toolbar by any empty area
+            wdg.bind("<ButtonPress-1>", self._drag_start, add="+")
+            wdg.bind("<B1-Motion>", self._drag_move, add="+")
+
         self.audio_vars = {}
         self.audio_devs = []
         self.refresh_audio()
-
-        self.hotkeys = {**DEFAULT_HOTKEYS, **self.cfg.get("hotkeys", {})}
-        self.hk_vars = {}
-        for i, (action, label) in enumerate((("record", "Record key:"), ("stop", "Stop key:"))):
-            ttk.Label(f, text=label).grid(row=7 + i, column=0, sticky="w")
-            var = tk.StringVar(value=self.hotkeys[action])
-            self.hk_vars[action] = var
-            ttk.Entry(f, textvariable=var, state="readonly", width=34).grid(row=7 + i, column=1, sticky="ew", pady=2)
-            ttk.Button(f, text="Set...", command=lambda a=action: self.capture_hotkey(a)).grid(
-                row=7 + i, column=2, padx=(4, 0))
-
-        row = ttk.Frame(f)
-        row.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(8, 4))
-        self.record_btn = ttk.Button(row, text="Record", command=self.on_record)
-        self.record_btn.pack(side="left", expand=True, fill="x", padx=(0, 4))
-        self.stop_btn = ttk.Button(row, text="Stop", command=self.stop, state="disabled")
-        self.stop_btn.pack(side="left", expand=True, fill="x")
-
-        self.status = tk.StringVar(value="Ready")
-        ttk.Label(f, textvariable=self.status).grid(row=10, column=0, columnspan=3)
+        if WIN and not pyaudio:
+            self.status.set("No audio: pip install PyAudioWPatch")
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self._bound = {}
         if WIN:
             self._start_hotkey_thread()
         self.apply_hotkeys()
+        self.root.update()
+        self.dock()
+        self.style_window()
 
     HK_ACTIONS = {"record": "on_record", "stop": "stop"}
+
+    def style_window(self):
+        """Windows 11: rounded corners and a subtle border on the borderless toolbar."""
+        if not WIN:
+            return
+        try:
+            hwnd = ctypes.c_void_p(ctypes.windll.user32.GetParent(self.root.winfo_id()) or self.root.winfo_id())
+            dwm = ctypes.windll.dwmapi
+            dwm.DwmSetWindowAttribute(hwnd, 33, ctypes.byref(ctypes.c_int(2)), 4)  # DWMWCP_ROUND
+            dwm.DwmSetWindowAttribute(hwnd, 34, ctypes.byref(ctypes.c_int(0x0040403A)), 4)  # border colour (BGR)
+        except Exception:
+            pass
+
+    def dock(self):
+        """Windows: put the toolbar under the selection (or above / inside if no room); else bottom-centre."""
+        if not WIN or self.manual_pos:
+            return
+        self.root.update_idletasks()
+        bw, bh = self.root.winfo_reqwidth(), self.root.winfo_reqheight()
+        gap = 8
+        if self.selected:
+            x, y, w, h = self.selected
+            mx, my, mw, mh = screen_for(self.selected)
+            px = min(max(x + w - bw, mx), mx + mw - bw)  # right-aligned with the selection, kept on screen
+            below, above = y + h + BORDER + gap, y - BORDER - gap - bh
+            if below + bh <= my + mh:
+                py = below
+            elif above >= my:
+                py = above
+            else:
+                py = my + mh - bh - gap  # no room outside: dock inside the bottom edge
+        else:
+            mx, my, mw, mh = next((m for m in monitors() if m[0] == 0 and m[1] == 0), monitors()[0])
+            px, py = mx + (mw - bw) // 2, my + mh - bh - 80
+        place(self.root, px, py, bw, bh)
+
+    def _drag_start(self, e):
+        if WIN:
+            self._drag = (e.x_root - self.root.winfo_rootx(), e.y_root - self.root.winfo_rooty())
+
+    def _drag_move(self, e):
+        if WIN and getattr(self, "_drag", None):
+            self.manual_pos = True
+            place(self.root, e.x_root - self._drag[0], e.y_root - self._drag[1],
+                  self.root.winfo_width(), self.root.winfo_height())
 
     def apply_hotkeys(self):
         """Window-local bindings everywhere; on Windows also global (RegisterHotKey)."""
@@ -630,15 +714,14 @@ class App:
         ready.wait()
 
     def capture_hotkey(self, action):
-        var = self.hk_vars[action]
-        var.set("Press keys... (Esc cancels)")
-        old = self.hotkeys[action]
+        self.status.set(f"Press new {action} shortcut... (Esc cancels)")
         win_alt = 0x20000 if WIN else 0x8
 
         def on_key(e):
             if e.keysym in MODIFIER_KEYSYMS:
                 return "break"
             self.root.unbind("<KeyPress>", bind_id)
+            self.status.set("Ready")
             if e.keysym != "Escape":
                 mods = [n for n, m in (("ctrl", 0x4), ("alt", win_alt), ("shift", 0x1)) if e.state & m]
                 combo = "+".join(mods + [e.keysym.lower()])
@@ -646,9 +729,9 @@ class App:
                     self.hotkeys[action] = combo
                     self.apply_hotkeys()
                     self.save_settings()
+                    self.status.set(f"{action.capitalize()}: {fmt_hotkey(combo)}")
                 else:
                     self.status.set("Use Ctrl/Alt/Shift + a letter, digit or F-key")
-            var.set(self.hotkeys[action])
             return "break"
 
         bind_id = self.root.bind("<KeyPress>", on_key, add="+")
@@ -656,20 +739,11 @@ class App:
 
     def refresh_audio(self):
         """(Re)list audio sources; keeps checked state, so plugged-in mics can be picked up."""
-        for w in self.audio_frame.winfo_children():
-            w.destroy()
         chosen = set(self.cfg.get("audio", [])) | {k for k, v in self.audio_vars.items() if v.get()}
         self.audio_devs = list_audio_devices()
         self.audio_vars = {d["key"]: tk.BooleanVar(value=d["key"] in chosen) for d in self.audio_devs}
         for v in self.audio_vars.values():
             v.trace_add("write", lambda *_: self.on_audio_change())
-        if WIN and not pyaudio:
-            ttk.Label(self.audio_frame, text="No audio: pip install PyAudioWPatch").pack(anchor="w")
-        elif not self.audio_devs:
-            ttk.Label(self.audio_frame, text="No audio devices found").pack(anchor="w")
-        for d in self.audio_devs:
-            ttk.Checkbutton(self.audio_frame, text=d["label"], variable=self.audio_vars[d["key"]]).pack(anchor="w")
-        ttk.Button(self.audio_frame, text="Refresh devices", command=self.refresh_audio).pack(anchor="w", pady=(4, 0))
         self.audio_selected = {k for k, v in self.audio_vars.items() if v.get()}
         self.sync_bar_audio()
 
@@ -695,12 +769,17 @@ class App:
                         print("Audio switch error:", e)
 
     def sync_bar_audio(self):
-        states = {}
-        for kind in ("mic", "sys"):
+        for kind, on_icon, off_icon, _title in KINDS:
+            g, tb, dd = self.groups[kind]
             keys = [d["key"] for d in self.audio_devs if d["kind"] == kind]
-            if keys:
-                states[kind] = any(k in self.audio_selected for k in keys)
-        self.bar.sync_audio(states)
+            if not keys:
+                g.pack_forget()
+                continue
+            on = any(k in self.audio_selected for k in keys)
+            tb.look(bg=ON if on else OFF, hover="#3fb85f" if on else HOVER, text=on_icon if on else off_icon)
+            dd.look(bg=ON if on else OFF, hover="#3fb85f" if on else HOVER)
+            g.pack(side="left", padx=3, before=self.sep2)
+        self.dock()
 
     def toggle_kind(self, kind):
         """Bar button: switch all mics / all system audio off, or back to what was on (default: first device)."""
@@ -715,16 +794,74 @@ class App:
             self.audio_vars[k].set(k in target)
 
     def show_kind_menu(self, kind, widget):
-        menu = tk.Menu(self.root, tearoff=0)
-        for d in self.audio_devs:
-            if d["kind"] == kind:
-                menu.add_checkbutton(label=d["label"].split(": ", 1)[1], variable=self.audio_vars[d["key"]])
-        menu.tk_popup(widget.winfo_rootx(), widget.winfo_rooty() + widget.winfo_height())
+        title = next(t for k, _a, _b, t in KINDS if k == kind)
+
+        def build():
+            items = [("header", title)]
+            for d in self.audio_devs:
+                if d["kind"] == kind:
+                    var = self.audio_vars[d["key"]]
+                    items.append(("item", d["label"].split(": ", 1)[1], var.get(),
+                                  lambda v=var: v.set(not v.get()), True))
+            items += [("sep",), ("item", "Refresh devices", None, self.refresh_audio, False)]
+            return items
+        self.popup.toggle(widget, build)
+
+    def show_options(self):
+        def pick(var, value):
+            return lambda: (var.set(value), self.save_settings())
+
+        def choices(var, options, fmt):
+            vals = list(options) + ([var.get()] if var.get() not in options else [])
+            return [("item", fmt(v), var.get() == v, pick(var, v), False) for v in vals]
+
+        def build():
+            cur = self.outdir.get().strip() or DEFAULT_DIR
+            items = [("header", "Save to"),
+                     ("item", os.path.basename(cur.rstrip("/\\")) or cur, True, self.open_folder, False),
+                     ("item", "Other location...", None, self.on_browse, False),
+                     ("sep",), ("header", "Timer")]
+            items += choices(self.delay, (0, 3, 5, 10), lambda v: "None" if v == 0 else f"{v} seconds")
+            items += [("sep",), ("header", "Format")]
+            items += choices(self.fmt, ("mp4", "gif"), lambda v: "MP4 video" if v == "mp4" else "GIF animation")
+            items += [("col",), ("header", "Frame rate")]
+            items += choices(self.fps, (15, 24, 30, 60), lambda v: f"{v} fps")
+            items += [("sep",), ("header", "Options"),
+                      ("item", "Show mouse pointer", self.pointer.get(),
+                       lambda: (self.pointer.set(not self.pointer.get()), self.save_settings()), True),
+                      ("item", "File name prefix...", None, self.ask_prefix, False)]
+            if self.selected:
+                items.append(("item", "Clear selection", None, self.on_clear, False))
+            items += [("sep",), ("header", "Shortcuts")]
+            for action in ("record", "stop"):
+                items.append(("item", f"{action.capitalize()}   {fmt_hotkey(self.hotkeys[action])}", None,
+                              lambda a=action: self.capture_hotkey(a), False))
+            return items
+        self.popup.toggle(self.opt_btn, build)
+
+    def ask_prefix(self):
+        v = simpledialog.askstring("File name prefix", "Recordings are named <prefix>-<date and time>:",
+                                   initialvalue=self.prefix.get(), parent=self.root)
+        if v and v.strip():
+            self.prefix.set(v.strip())
+            self.save_settings()
+
+    def open_folder(self):
+        path = self.last_saved or self.outdir.get().strip() or DEFAULT_DIR
+        try:
+            if WIN:
+                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)] if os.path.isfile(path)
+                                 else ["explorer", os.path.normpath(path)])
+            else:
+                subprocess.Popen(["xdg-open", path if os.path.isdir(path) else os.path.dirname(path)])
+        except OSError as e:
+            print("Open folder error:", e)
 
     def save_settings(self):
         try:
             self.cfg.update(outdir=self.outdir.get().strip(), delay=self.delay.get(),
                             fps=self.fps.get(), format=self.fmt.get(), hotkeys=self.hotkeys,
+                            prefix=self.prefix.get(), pointer=self.pointer.get(),
                             audio=[k for k, v in self.audio_vars.items() if v.get()])
         except tk.TclError:  # spinbox holds non-numeric text
             return
@@ -738,6 +875,7 @@ class App:
         d = filedialog.askdirectory(initialdir=self.outdir.get() or DEFAULT_DIR, title="Save recordings to")
         if d:
             self.outdir.set(os.path.normpath(d))
+            self.last_saved = None
             self.save_settings()
 
     def set_status(self, s):
@@ -745,7 +883,6 @@ class App:
 
     def on_select(self):
         self.overlay.hide()
-        self.bar.hide()
         if WIN:
             self.root.withdraw()
             self.root.update()
@@ -757,33 +894,29 @@ class App:
             self.status.set("Selection cancelled")
             if self.selected:
                 self.overlay.show(self.selected)
-                self.bar.show(self.selected)
+            self.dock()
             return
         self.selected = rect
+        self.manual_pos = False
         self.overlay.show(rect)
-        self.bar.show(rect)
-        self.clear_btn.config(state="normal")
-        x, y, w, h = rect
-        self.status.set(f"Selected: {x},{y} {w}x{h}")
+        self.dock()
+        self.status.set(f"{rect[2]}\u00d7{rect[3]} selected")
 
     def on_clear(self):
         self.selected = None
         self.overlay.hide()
-        self.bar.hide()
-        self.clear_btn.config(state="disabled")
+        self.manual_pos = False
+        self.dock()
         self.status.set("Selection cleared")
 
     def on_record(self):
-        if str(self.record_btn["state"]) == "disabled":  # already recording / counting down
+        if self.state != "idle":  # already recording / counting down
             return
         if not self.selected:
             self.on_select()  # no area yet: let the user pick one, then carry on recording
             if not self.selected:
                 return
-        name = self.fname.get().strip()
-        if not name:
-            self.status.set("Please enter filename")
-            return
+        name = f"{self.prefix.get().strip() or 'capture'}-{time.strftime('%Y-%m-%d-%H-%M-%S')}"
         if not shutil.which("ffmpeg"):
             self.status.set("ffmpeg not found in PATH")
             return
@@ -806,14 +939,14 @@ class App:
         delay = self.delay.get()
         to_gif = self.fmt.get() == "gif"
         if WIN:
-            grab = ["-f", "gdigrab", "-framerate", str(fps),
+            grab = ["-f", "gdigrab", "-framerate", str(fps), "-draw_mouse", str(int(self.pointer.get())),
                     "-offset_x", str(x), "-offset_y", str(y),
                     "-video_size", f"{w}x{h}", "-i", "desktop"]
         else:
             display = os.environ.get("DISPLAY", ":0")
             if "." not in display:
                 display += ".0"
-            grab = ["-f", "x11grab", "-framerate", str(fps),
+            grab = ["-f", "x11grab", "-framerate", str(fps), "-draw_mouse", str(int(self.pointer.get())),
                     "-video_size", f"{w}x{h}", "-i", f"{display}+{x},{y}"]
         audio_in, audio_out = [], []
         use_audio = not to_gif and bool(self.audio_devs)
@@ -841,10 +974,7 @@ class App:
             self.out_mp4,
         ]
 
-        self.record_btn.config(state="disabled")
-        self.select_btn.config(state="disabled")
-        self.stop_btn.config(state="normal")
-        self.status.set(f"Starting in {delay}s...")
+        self.status.set(f"Starting in {delay}s..." if delay else "Starting...")
         self.state, self.t0, self.delay_s = "countdown", time.time(), delay
         self.tick()
 
@@ -886,20 +1016,26 @@ class App:
         self.status.set("Recording...")
 
     def tick(self):
-        """Refresh the control bar: countdown, then elapsed time."""
-        if self.state == "countdown":
-            left = max(0, int(self.delay_s - (time.time() - self.t0) + 0.999))
-            self.bar.update("countdown", f"{left}s")
-        elif self.state == "recording":
-            e = int(time.time() - self.t0)
-            self.bar.update("recording", f"{e // 60:02d}:{e % 60:02d}")
-        elif self.state == "stopping":
-            self.bar.update("stopping")
-        else:
+        """Refresh the record button: countdown, then elapsed time."""
+        if self.state == "idle":
             return
+        self._render_state()
         self.root.after(250, self.tick)
 
-    def on_bar_click(self):
+    def _render_state(self):
+        if self.state == "countdown":
+            left = max(0, int(self.delay_s - (time.time() - self.t0) + 0.999))
+            self.rec_btn.look(bg="#4a4a50", hover="#4a4a50", text=f"{left}", enabled=False)
+        elif self.state == "recording":
+            e = int(time.time() - self.t0)
+            self.rec_btn.look(bg="#4a4a50", hover="#5e5e66", text=f"\u25a0  {e // 60:02d}:{e % 60:02d}")
+        elif self.state == "stopping":
+            self.rec_btn.look(bg="#4a4a50", hover="#4a4a50", text="Saving...", enabled=False)
+        else:
+            self.rec_btn.look(bg=ACCENT, hover=ACCENT_HOVER, text="\u25cf  Record")
+        self.area_btn.look(enabled=self.state == "idle")
+
+    def on_record_click(self):
         if self.state == "idle":
             self.on_record()
         elif self.state == "recording":
@@ -922,15 +1058,13 @@ class App:
 
     def _reset_buttons(self):
         self.state = "idle"
-        self.bar.update("idle")
-        self.record_btn.config(state="normal")
-        self.select_btn.config(state="normal")
-        self.stop_btn.config(state="disabled")
+        self._render_state()
 
     def on_finished(self, to_gif, fps):
         self._reset_buttons()
         if not to_gif:
-            self.status.set(f"Saved MP4: {self.out_mp4}")
+            self.last_saved = self.out_mp4
+            self.status.set(f"Saved {os.path.basename(self.out_mp4)}  \u00b7  click to show")
             return
         self.status.set("Converting to GIF...")
 
@@ -947,7 +1081,8 @@ class App:
                 if shutil.which("gifsicle"):
                     subprocess.run(["gifsicle", "-O3", self.out_gif, "-o", self.out_gif], **kw)
                 os.remove(self.palette)
-                self.set_status(f"Saved GIF: {self.out_gif}")
+                self.last_saved = self.out_gif
+                self.set_status(f"Saved {os.path.basename(self.out_gif)}  \u00b7  click to show")
             except Exception as e:
                 print("GIF conversion error:", e)
                 self.set_status("GIF conversion failed")

@@ -41,7 +41,7 @@ The floating bar has **Mic** and **System** buttons to flip each on/off, and a �
 - Linux: needs PulseAudio/PipeWire and `pactl` (`pulseaudio-utils`).
 
 ### Settings
-Save folder, delay, FPS, format and hotkeys are set in the window and remembered (`%APPDATA%\capty\config.json`, or `~/.config/capty/config.json` on Linux). Default hotkeys: Ctrl+Alt+R record, Ctrl+Alt+S stop; click **Set...** next to a key to change it. On Linux hotkeys work while the Capty window has focus.
+Everything in the Options menu is remembered (`%APPDATA%\capty\config.json`, or `~/.config/capty/config.json` on Linux). Default hotkeys: Ctrl+Alt+R record, Ctrl+Alt+S stop; click a shortcut in the Options menu to change it. On Linux hotkeys work while the Capty window has focus.
 
 ### Install
 
@@ -71,15 +71,16 @@ sudo update-desktop-database || true
 ```
 
 ### Usage
-1. Launch Capty (from your app menu or by running `capty` / `python3 capty.py`).
-2. Click **Select area** and draw the rectangle you want to record.
-3. Set **Filename**, **Delay**, **Format** (MP4 or GIF), and **FPS**.
-4. Click **Record**. After the countdown, recording starts.
-5. Click **Stop** (or press Ctrl+Alt+S while the Capty window has focus).
-6. Output is saved to `~/Videos` as either `.mp4` or `.gif`. A palette image is generated temporarily for GIFs.
+Capty is a single floating toolbar: **✕ | Area | 🎤 ▾ | 🔊 ▾ | Options ▾ | Record**.
+
+1. Launch Capty (Start Menu on Windows after `--install`, or `python capty.py`).
+2. Click **Area** and drag the region to record (or just press **Record** and it asks for one). The toolbar docks under the selection; drag it by any empty spot to move it.
+3. Flip 🎤 / 🔊 on or off, or open ▾ to choose devices (works while recording).
+4. **Options** has save folder, timer, MP4/GIF, frame rate, mouse pointer, file name prefix and shortcuts.
+5. Click **Record**; it turns into a **■ timer**, click it again to stop. The status line shows the saved file, click it to show it in the folder.
 
 Tips:
-- If the chosen base filename already exists, a timestamp suffix is added automatically to avoid overwriting.
+- Files are named `<prefix>-<date and time>` (prefix defaults to `capture`).
 - If `gifsicle` is installed, GIFs are optimized automatically.
 
 ### Keyboard shortcuts
