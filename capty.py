@@ -123,43 +123,84 @@ def select_area_slop():
         return None
 
 
+def place(win, x, y, w, h):
+    """Position a toplevel in physical pixels. On Windows, tk's geometry gets rescaled when the window
+    lands on a monitor with different DPI scaling, so set the real window rect directly."""
+    win.geometry(f"{w}x{h}{x:+d}{y:+d}")
+    if WIN:
+        win.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(win.winfo_id()) or win.winfo_id()
+        # HWND_TOPMOST=-1, SWP_NOACTIVATE=0x10
+        ctypes.windll.user32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), x, y, w, h, 0x10)
+
+
+def monitors():
+    """Windows: [(x, y, w, h)] per monitor, in physical pixels."""
+    rects = []
+    proc_t = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p,
+                                ctypes.POINTER(ctypes.wintypes.RECT), ctypes.c_void_p)
+
+    def cb(_m, _dc, r, _d):
+        r = r.contents
+        rects.append((r.left, r.top, r.right - r.left, r.bottom - r.top))
+        return 1
+
+    ctypes.windll.user32.EnumDisplayMonitors(None, None, proc_t(cb), 0)
+    return rects or [virtual_screen()]
+
+
 def select_area(root):
-    """Windows: fullscreen dim overlay; drag to select. Returns (x, y, w, h) or None."""
-    vx, vy, vw, vh = virtual_screen()
-    top = tk.Toplevel(root)
-    top.overrideredirect(True)
-    top.attributes("-topmost", True)
-    top.attributes("-alpha", 0.3)
-    top.configure(bg="black", cursor="crosshair")
-    top.geometry(f"{vw}x{vh}{vx:+d}{vy:+d}")
-    canvas = tk.Canvas(top, bg="black", highlightthickness=0)
-    canvas.pack(fill="both", expand=True)
-    state = {"start": None, "rect": None, "result": None}
+    """Windows: dim overlay on every monitor; drag to select. Returns (x, y, w, h) or None."""
+    tops = []  # (toplevel, canvas, origin_x, origin_y)
+    state = {"start": None, "result": None}
+
+    def close(_e=None):
+        root.unbind_all("<Escape>")
+        for t, _c, _x, _y in tops:
+            t.destroy()
+        tops.clear()
+
+    def redraw(cur):
+        sx, sy = state["start"]
+        for _t, c, ox, oy in tops:
+            c.delete("sel")
+            c.create_rectangle(sx - ox, sy - oy, cur[0] - ox, cur[1] - oy,
+                               outline=BORDER_COLOR, width=2, fill="white", tags="sel")
 
     def press(e):
         state["start"] = (e.x_root, e.y_root)
-        state["rect"] = canvas.create_rectangle(e.x, e.y, e.x, e.y, outline=BORDER_COLOR, width=2, fill="white")
 
     def drag(e):
         if state["start"]:
-            sx, sy = state["start"]
-            canvas.coords(state["rect"], sx - vx, sy - vy, e.x_root - vx, e.y_root - vy)
+            redraw((e.x_root, e.y_root))
 
     def release(e):
         if state["start"]:
             sx, sy = state["start"]
-            x, y = min(sx, e.x_root), min(sy, e.y_root)
             w, h = abs(e.x_root - sx), abs(e.y_root - sy)
             if w > 1 and h > 1:
-                state["result"] = (x, y, w, h)
-        top.destroy()
+                state["result"] = (min(sx, e.x_root), min(sy, e.y_root), w, h)
+        close()
 
-    canvas.bind("<ButtonPress-1>", press)
-    canvas.bind("<B1-Motion>", drag)
-    canvas.bind("<ButtonRelease-1>", release)
-    top.bind("<Escape>", lambda e: top.destroy())
-    top.focus_force()
-    root.wait_window(top)
+    # one window per monitor: a single window spanning monitors with different DPI scaling is unreliable
+    for mx, my, mw, mh in monitors():
+        t = tk.Toplevel(root)
+        t.overrideredirect(True)
+        t.attributes("-topmost", True)
+        t.attributes("-alpha", 0.3)
+        t.configure(bg="black", cursor="crosshair")
+        place(t, mx, my, mw, mh)
+        c = tk.Canvas(t, bg="black", highlightthickness=0)
+        c.pack(fill="both", expand=True)
+        c.bind("<ButtonPress-1>", press)
+        c.bind("<B1-Motion>", drag)
+        c.bind("<ButtonRelease-1>", release)
+        tops.append((t, c, mx, my))
+    root.bind_all("<Escape>", close)
+    tops[0][0].focus_force()
+    while tops:  # wait until all overlays are closed
+        root.update()
+        time.sleep(0.01)
     return state["result"]
 
 
@@ -186,8 +227,8 @@ class Overlay:
             (t, h, x + w, y),
         ]
         for win, (gw, gh, gx, gy) in zip(self.wins, geoms):
-            win.geometry(f"{gw}x{gh}{gx:+d}{gy:+d}")
             win.deiconify()
+            place(win, gx, gy, gw, gh)
 
     def hide(self):
         for w in self.wins:
