@@ -653,8 +653,9 @@ class App:
         if str(self.record_btn["state"]) == "disabled":  # already recording / counting down
             return
         if not self.selected:
-            self.status.set("Please select an area first")
-            return
+            self.on_select()  # no area yet: let the user pick one, then carry on recording
+            if not self.selected:
+                return
         name = self.fname.get().strip()
         if not name:
             self.status.set("Please enter filename")
