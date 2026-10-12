@@ -235,6 +235,67 @@ class Overlay:
             w.withdraw()
 
 
+class ControlBar:
+    """Small floating Record/Stop bar docked next to the selection (outside the captured area)."""
+    GAP = 8
+
+    def __init__(self, root, on_click):
+        self.win = tk.Toplevel(root)
+        self.win.overrideredirect(True)
+        self.win.attributes("-topmost", True)
+        self.win.configure(bg="#202020")
+        self.win.withdraw()
+        self.btn = tk.Button(self.win, text="● Record", command=on_click, bg="#d9232d", fg="white",
+                             activebackground="#ff3b45", activeforeground="white", relief="flat",
+                             font=("Segoe UI" if WIN else "TkDefaultFont", 10, "bold"), padx=12, pady=4, bd=0)
+        self.btn.pack(side="left", padx=(8, 6), pady=8)
+        self.label = tk.Label(self.win, text="", bg="#202020", fg="white", width=7,
+                              font=("Segoe UI" if WIN else "TkDefaultFont", 10))
+        self.label.pack(side="left", padx=(0, 10))
+        self.win.update_idletasks()
+        self.size = (self.win.winfo_reqwidth(), self.win.winfo_reqheight())
+
+    def _bounds(self, rect):
+        """Screen rect containing the selection's center."""
+        x, y, w, h = rect
+        cx, cy = x + w // 2, y + h // 2
+        if WIN:
+            for mx, my, mw, mh in monitors():
+                if mx <= cx < mx + mw and my <= cy < my + mh:
+                    return mx, my, mw, mh
+        return 0, 0, self.win.winfo_screenwidth(), self.win.winfo_screenheight()
+
+    def show(self, rect):
+        x, y, w, h = rect
+        bw, bh = self.size
+        mx, my, mw, mh = self._bounds(rect)
+        px = min(max(x + w - bw, mx), mx + mw - bw)  # right-aligned with the selection, kept on screen
+        below = y + h + BORDER + self.GAP
+        above = y - BORDER - self.GAP - bh
+        if below + bh <= my + mh:
+            py = below
+        elif above >= my:
+            py = above
+        else:
+            py = my + mh - bh - self.GAP  # no room outside: dock inside the bottom edge
+        self.win.deiconify()
+        place(self.win, px, py, bw, bh)
+
+    def hide(self):
+        self.win.withdraw()
+
+    def update(self, state, text=""):
+        if state == "recording":
+            self.btn.config(text="■ Stop", bg="#444444", activebackground="#666666", state="normal")
+        elif state == "countdown":
+            self.btn.config(text="● Record", bg="#d9232d", state="disabled")
+        elif state == "stopping":
+            self.btn.config(text="Saving...", bg="#444444", state="disabled")
+        else:
+            self.btn.config(text="● Record", bg="#d9232d", activebackground="#ff3b45", state="normal")
+        self.label.config(text=text)
+
+
 class App:
     def __init__(self):
         self.root = tk.Tk()
@@ -247,6 +308,8 @@ class App:
         self.ffproc = None
         self.out_mp4 = self.out_gif = self.palette = None
         self.overlay = Overlay(self.root)
+        self.state = "idle"  # idle | countdown | recording | stopping
+        self.bar = ControlBar(self.root, self.on_bar_click)
 
         f = ttk.Frame(self.root, padding=10)
         f.pack()
@@ -398,6 +461,7 @@ class App:
 
     def on_select(self):
         self.overlay.hide()
+        self.bar.hide()
         if WIN:
             self.root.withdraw()
             self.root.update()
@@ -409,9 +473,11 @@ class App:
             self.status.set("Selection cancelled")
             if self.selected:
                 self.overlay.show(self.selected)
+                self.bar.show(self.selected)
             return
         self.selected = rect
         self.overlay.show(rect)
+        self.bar.show(rect)
         self.clear_btn.config(state="normal")
         x, y, w, h = rect
         self.status.set(f"Selected: {x},{y} {w}x{h}")
@@ -419,6 +485,7 @@ class App:
     def on_clear(self):
         self.selected = None
         self.overlay.hide()
+        self.bar.hide()
         self.clear_btn.config(state="disabled")
         self.status.set("Selection cleared")
 
@@ -474,14 +541,16 @@ class App:
         self.select_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         self.status.set(f"Starting in {delay}s...")
+        self.state, self.t0, self.delay_s = "countdown", time.time(), delay
+        self.tick()
 
         def worker():
             try:
                 time.sleep(delay)
-                self.set_status("Recording...")
                 self.ffproc = subprocess.Popen(
                     cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+                self.root.after(0, self._rec_started)
                 self.ffproc.wait()
                 self.ffproc = None
                 self.root.after(0, self.on_finished, to_gif, fps)
@@ -493,6 +562,30 @@ class App:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _rec_started(self):
+        self.state, self.t0 = "recording", time.time()
+        self.status.set("Recording...")
+
+    def tick(self):
+        """Refresh the control bar: countdown, then elapsed time."""
+        if self.state == "countdown":
+            left = max(0, int(self.delay_s - (time.time() - self.t0) + 0.999))
+            self.bar.update("countdown", f"{left}s")
+        elif self.state == "recording":
+            e = int(time.time() - self.t0)
+            self.bar.update("recording", f"{e // 60:02d}:{e % 60:02d}")
+        elif self.state == "stopping":
+            self.bar.update("stopping")
+        else:
+            return
+        self.root.after(250, self.tick)
+
+    def on_bar_click(self):
+        if self.state == "idle":
+            self.on_record()
+        elif self.state == "recording":
+            self.stop()
+
     def stop(self):
         p = self.ffproc
         if not p:
@@ -502,11 +595,14 @@ class App:
             p.stdin.write(b"q")  # ffmpeg finalizes the file on 'q'
             p.stdin.flush()
             self.status.set("Stopping...")
+            self.state = "stopping"
         except Exception as e:
             print("Stop error:", e)
             p.terminate()
 
     def _reset_buttons(self):
+        self.state = "idle"
+        self.bar.update("idle")
         self.record_btn.config(state="normal")
         self.select_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
