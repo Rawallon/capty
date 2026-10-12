@@ -23,7 +23,7 @@ Notes:
 - Capty uses FFmpeg's `x11grab`. It works best on X11. On Wayland, run an X11 session or ensure XWayland is available.
 
 ### Windows
-Requires Python 3 (with tkinter, included in the python.org installer) and `ffmpeg` in `PATH` (e.g. `winget install Gyan.FFmpeg`). Optional: `gifsicle`.
+Requires Python 3 (with tkinter, included in the python.org installer) and `ffmpeg` in `PATH` (e.g. `winget install Gyan.FFmpeg`). Optional: `gifsicle`, and `pip install PyAudioWPatch` for audio.
 
 ```powershell
 python capty.py --install   # adds a Start Menu shortcut: press Win, type "Capty"
@@ -31,6 +31,12 @@ python capty.py             # or run directly
 ```
 
 Uses FFmpeg `gdigrab` (no slop needed); same `capty.py` as Linux. Hotkeys are global on Windows.
+
+### Audio
+Pick which audio ends up in the MP4: tick any combination of **system audio** (what your PC plays, one entry per output device) and **microphones** (one entry per plugged-in mic); they're mixed together. Nothing is recorded by default. Use **Refresh devices** after plugging in a mic. GIFs have no audio.
+
+- Windows: `pip install PyAudioWPatch` (WASAPI loopback for system audio).
+- Linux: needs PulseAudio/PipeWire and `pactl` (`pulseaudio-utils`).
 
 ### Settings
 Save folder, delay, FPS, format and hotkeys are set in the window and remembered (`%APPDATA%\capty\config.json`, or `~/.config/capty/config.json` on Linux). Default hotkeys: Ctrl+Alt+R record, Ctrl+Alt+S stop; click **Set...** next to a key to change it. On Linux hotkeys work while the Capty window has focus.
