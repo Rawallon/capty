@@ -1,6 +1,6 @@
 ## Capty — simple area screen recorder for Linux (MP4/GIF)
 
-Capty lets you quickly record a selected screen area to MP4 or GIF on Linux. It provides a tiny GTK window to pick a region, set a delay, choose FPS and format, then start/stop recording.
+Capty lets you quickly record a selected screen area to MP4 or GIF on Linux. It provides a tiny tkinter window to pick a region, set a delay, choose FPS and format, then start/stop recording.
 
 ### Features
 - **Area selection**: draw a rectangle using `slop`.
@@ -16,7 +16,7 @@ Install runtime dependencies (Debian/Ubuntu):
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-gi gir1.2-gtk-3.0 ffmpeg slop gifsicle
+sudo apt install -y python3 python3-tk ffmpeg slop gifsicle
 ```
 
 Notes:
@@ -29,7 +29,7 @@ Requires Python 3 (with tkinter, included in the python.org installer) and `ffmp
 python capty.py
 ```
 
-Uses FFmpeg `gdigrab` and a tkinter UI (no GTK/slop needed). Ctrl+Alt+S is a global stop hotkey. Output goes to `%USERPROFILE%\Videos`.
+Uses FFmpeg `gdigrab` (no slop needed); same `capty.py` as Linux. Ctrl+Alt+S is a global stop hotkey. Output goes to `%USERPROFILE%\Videos`.
 
 ### Install
 
@@ -37,7 +37,7 @@ Uses FFmpeg `gdigrab` and a tkinter UI (no GTK/slop needed). Ctrl+Alt+S is a glo
 If you have `capty_0.1.0_amd64.deb` in this repo:
 
 ```bash
-sudo apt install -y python3 python3-gi gir1.2-gtk-3.0 ffmpeg slop gifsicle
+sudo apt install -y python3 python3-tk ffmpeg slop gifsicle
 sudo dpkg -i capty_0.1.0_amd64.deb || sudo apt -f install -y
 ```
 
@@ -46,7 +46,7 @@ This installs a launcher and an executable `capty` under `/usr/local/bin/capty`.
 #### Option 2: Run from source
 
 ```bash
-sudo apt install -y python3 python3-gi gir1.2-gtk-3.0 ffmpeg slop gifsicle
+sudo apt install -y python3 python3-tk ffmpeg slop gifsicle
 python3 capty.py
 ```
 
@@ -97,8 +97,7 @@ The build script will:
 You can specify a custom version: `./build_deb.sh 1.2.3`
 
 ### Project structure
-- `capty.py`: main GTK application (Linux); launches `capty_windows.py` on Windows.
-- `capty_windows.py`: tkinter + gdigrab port for Windows.
+- `capty.py`: the whole app (tkinter UI; Linux x11grab+slop, Windows gdigrab).
 - `capty.desktop`: desktop launcher entry (Exec: `/usr/local/bin/capty`).
 - `icon.png`: optional icon if you package it.
 - `build_deb.sh`: build script for creating .deb packages with proper metadata.

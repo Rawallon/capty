@@ -24,8 +24,7 @@ chmod +x capty.py
 # Build the package with proper metadata
 fpm -s dir -t deb -n capty -v "$VERSION" \
   --depends "python3" \
-  --depends "python3-gi" \
-  --depends "gir1.2-gtk-3.0" \
+  --depends "python3-tk" \
   --depends "ffmpeg" \
   --depends "slop" \
   --depends "gifsicle" \
