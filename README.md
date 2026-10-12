@@ -22,6 +22,15 @@ sudo apt install -y python3 python3-gi gir1.2-gtk-3.0 ffmpeg slop gifsicle
 Notes:
 - Capty uses FFmpeg's `x11grab`. It works best on X11. On Wayland, run an X11 session or ensure XWayland is available.
 
+### Windows
+Requires Python 3 (with tkinter, included in the python.org installer) and `ffmpeg` in `PATH` (e.g. `winget install Gyan.FFmpeg`). Optional: `gifsicle` for GIF optimization.
+
+```powershell
+python capty.py
+```
+
+Uses FFmpeg `gdigrab` and a tkinter UI (no GTK/slop needed). Ctrl+Alt+S is a global stop hotkey. Output goes to `%USERPROFILE%\Videos`.
+
 ### Install
 
 #### Option 1: From the bundled .deb
@@ -88,7 +97,8 @@ The build script will:
 You can specify a custom version: `./build_deb.sh 1.2.3`
 
 ### Project structure
-- `capty.py`: main GTK application.
+- `capty.py`: main GTK application (Linux); launches `capty_windows.py` on Windows.
+- `capty_windows.py`: tkinter + gdigrab port for Windows.
 - `capty.desktop`: desktop launcher entry (Exec: `/usr/local/bin/capty`).
 - `icon.png`: optional icon if you package it.
 - `build_deb.sh`: build script for creating .deb packages with proper metadata.

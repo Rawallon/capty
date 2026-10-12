@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+import sys
+if sys.platform == "win32":
+    from capty_windows import main
+    main()
+    sys.exit(0)
+
 import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
