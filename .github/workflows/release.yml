@@ -38,10 +38,15 @@
               ./icon.png=/usr/share/pixmaps/capty.png
             # List the created package
             ls -la capty_*_amd64.deb
+        - name: Package Windows zip
+          run: |
+            zip capty-windows.zip capty.py icon.png README.md
         - name: Upload to Release
           uses: softprops/action-gh-release@v2
           with:
-            files: capty_*_amd64.deb
+            files: |
+              capty_*_amd64.deb
+              capty-windows.zip
             update_existing: true
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
